@@ -1,0 +1,2 @@
+复制链接到浏览器
+ https://gitee.com/ai4c/hirebot-web/tree/prd_ux__prototype
