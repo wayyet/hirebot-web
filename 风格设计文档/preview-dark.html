@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SkillHub — Design Preview (Dark)</title>
+<style>
+  :root {
+    /* === Surfaces & Borders === */
+    /* 暗色模式渐变：保留原渐变的"暖→冷"对角线方向，但全部下沉到接近黑的明度。
+       源站无暗色模式，此为合理推导：peach → pink → ice 的色相骨架被保留，
+       亮度从 ~95% 压到 ~10%，同色相暗化。 */
+    --bg-gradient: linear-gradient(135deg, #1a0f08 0%, #1a1320 50%, #0e1224 100%);
+    --surface: #171717;
+    --surface-soft: #1f1f1f;
+    --border: #2a2a2a;
+    --border-row: #232323;
+    --border-input: #333333;
+    --border-hover: #404040;
+
+    /* === Text === */
+    --heading: #fafafa;
+    --body: #d4d4d4;
+    --body-soft: #a3a3a3;
+    --caption: #737373;
+    --disabled: #525252;
+
+    /* === Brand: CTA 反转为白色（黑色在暗背景上会消失），品牌蓝维持高亮角色 === */
+    --black: #ffffff;       /* CTA 实色填充：白 */
+    --black-hover: #e5e5e5; /* CTA 悬停 */
+    --cta-text: #0a0a0a;    /* CTA 文字色（亮模式是 #fff，暗模式反转为深色） */
+    --brand-blue: #6e8bff;  /* 略提亮以保证暗背景上的对比度 */
+
+    /* === Tag Tints (暗化版本：保留色相，降低明度，提升文字亮度) === */
+    --tag-blue-bg:   #1c2750;  --tag-blue-fg:   #8ea4ff;
+    --tag-orange-bg: #3a2814;  --tag-orange-fg: #f0a560;
+    --tag-green-bg:  #143620;  --tag-green-fg:  #5dd99c;
+    --tag-gray-bg:   #2a2a2a;  --tag-gray-fg:   #a3a3a3;
+    --tag-pink-bg:   #3a1a26;  --tag-pink-fg:   #e879a3;
+
+    /* === Avatar Tints (暗化版本) === */
+    --av-green-bg:  #163823;  --av-green-fg:  #5dd99c;
+    --av-orange-bg: #3a2814;  --av-orange-fg: #f0a560;
+    --av-gray-bg:   #2a2a2a;  --av-gray-fg:   #a3a3a3;
+    --av-blue-bg:   #1f2c5a;  --av-blue-fg:   #8ea4ff;
+    --av-purple-bg: #261e4a;  --av-purple-fg: #a596e8;
+    --av-pink-bg:   #3a1a1c;  --av-pink-fg:   #f08a96;
+
+    /* === Status === */
+    --success: #34d399;
+    --success-bg: #0d2920;
+    --success-border: #1f4a36;
+    --success-text: #5dd99c;
+    --accent-orange: #ff8e60;
+
+    /* === Shadows (暗色模式中阴影感更弱，主要靠边框分层) === */
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.30);
+    --shadow-lift: 0 8px 24px rgba(0, 0, 0, 0.40);
+    --shadow-cta: 0 4px 16px rgba(255, 255, 255, 0.10);
+    --focus-ring: 0 0 0 3px rgba(110, 139, 255, 0.30);
+
+    /* === Radii === */
+    --r-sm: 4px;
+    --r-md: 8px;
+    --r-lg: 12px;
+    --r-xl: 16px;
+    --r-2xl: 20px;
+    --r-pill: 999px;
+
+    /* === Type === */
+    --font-primary: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-gradient);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: var(--body);
+    font-family: var(--font-primary);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ===== Navigation ===== */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    margin: 16px auto 0;
+    max-width: 1200px;
+    background: rgba(23, 23, 23, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--heading);
+    font-weight: 600;
+    font-size: 18px;
+  }
+  .brand .mascot {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #ffd86b 0%, #ff9f43 100%);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .nav-links { display: flex; gap: 36px; }
+  .nav-links a {
+    color: var(--heading);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    position: relative;
+  }
+  .nav-links a .new-tag {
+    color: var(--accent-orange);
+    font-size: 11px;
+    font-weight: 600;
+    position: absolute;
+    top: -10px;
+    right: -22px;
+  }
+  .nav-cta { display: flex; gap: 8px; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 11px 22px;
+    border-radius: var(--r-pill);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+    border: 1px solid transparent;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--black); color: var(--cta-text); }
+  .btn-primary:hover { background: var(--black-hover); box-shadow: var(--shadow-cta); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--heading);
+    border-color: var(--border-input);
+  }
+  .btn-ghost:hover { background: var(--surface-soft); border-color: var(--border-hover); }
+  .btn-sm { padding: 8px 16px; font-size: 13px; }
+
+  /* ===== Hero ===== */
+  .hero {
+    text-align: center;
+    padding: 80px 0 64px;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(23, 23, 23, 0.6);
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--heading);
+    margin-bottom: 24px;
+  }
+  .hero h1 {
+    color: var(--heading);
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.5px;
+    margin: 0 0 20px;
+  }
+  .hero h1 .highlight {
+    color: var(--brand-blue);
+    position: relative;
+    margin-right: 4px;
+  }
+  .hero h1 .highlight::after {
+    content: "👀";
+    font-size: 0.55em;
+    position: absolute;
+    top: 0;
+    right: -1.4em;
+  }
+  .hero p {
+    font-size: 16px;
+    line-height: 1.55;
+    max-width: 56ch;
+    color: var(--body-soft);
+    margin: 0 auto 36px;
+    font-weight: 400;
+  }
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ===== Install Card ===== */
+  .install-card {
+    max-width: 720px;
+    margin: 48px auto 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    overflow: hidden;
+  }
+  .install-tabs {
+    display: flex;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .install-tab {
+    padding: 14px 4px;
+    margin-right: 24px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--body-soft);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+  }
+  .install-tab.active {
+    color: var(--heading);
+    border-bottom-color: var(--heading);
+  }
+  .install-body {
+    padding: 16px 20px;
+  }
+  .install-code {
+    background: var(--surface-soft);
+    border-radius: var(--r-lg);
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--body);
+    line-height: 1.55;
+    position: relative;
+  }
+  .install-code .copy {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    color: var(--body-soft);
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  /* ===== Section ===== */
+  .section-heading {
+    color: var(--heading);
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.30;
+    letter-spacing: -0.2px;
+    margin: 96px 0 32px;
+    text-align: center;
+  }
+
+  /* ===== Search Bar ===== */
+  .search-row {
+    display: flex;
+    align-items: center;
+    max-width: 720px;
+    margin: 0 auto 48px;
+    background: var(--surface);
+    border: 1px solid var(--border-input);
+    border-radius: var(--r-pill);
+    padding: 4px 4px 4px 20px;
+  }
+  .search-row .search-icon { color: var(--caption); margin-right: 10px; }
+  .search-row input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--heading);
+    padding: 12px 0;
+  }
+  .search-row input::placeholder { color: var(--caption); }
+  .search-row .btn { font-size: 14px; }
+
+  /* ===== Card Grid ===== */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-2xl);
+    padding: 24px 20px;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 200ms ease;
+  }
+  .card:hover { box-shadow: var(--shadow-lift); }
+  .card-title {
+    color: var(--heading);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .skill-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-row);
+  }
+  .skill-row:last-child { border-bottom: none; }
+  .skill-info { flex: 1; min-width: 0; }
+  .skill-name {
+    color: var(--heading);
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .skill-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--caption);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== Avatar (Squircle) ===== */
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .av-green  { background: var(--av-green-bg);  color: var(--av-green-fg); }
+  .av-orange { background: var(--av-orange-bg); color: var(--av-orange-fg); }
+  .av-gray   { background: var(--av-gray-bg);   color: var(--av-gray-fg); }
+  .av-blue   { background: var(--av-blue-bg);   color: var(--av-blue-fg); }
+  .av-purple { background: var(--av-purple-bg); color: var(--av-purple-fg); }
+  .av-pink   { background: var(--av-pink-bg);   color: var(--av-pink-fg); }
+  .av-solid-blue   { background: var(--brand-blue); color: #0a0a0a; }
+  .av-solid-purple { background: #8b7adf; color: #0a0a0a; }
+
+  /* ===== Tag Pills ===== */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  .tag-blue   { background: var(--tag-blue-bg);   color: var(--tag-blue-fg); }
+  .tag-orange { background: var(--tag-orange-bg); color: var(--tag-orange-fg); }
+  .tag-green  { background: var(--tag-green-bg);  color: var(--tag-green-fg); }
+  .tag-gray   { background: var(--tag-gray-bg);   color: var(--tag-gray-fg); }
+  .tag-pink   { background: var(--tag-pink-bg);   color: var(--tag-pink-fg); }
+
+  /* ===== Typography Scale ===== */
+  .type-scale {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-2xl);
+    box-shadow: var(--shadow-card);
+    padding: 24px 32px;
+    display: grid;
+    gap: 4px;
+  }
+  .type-scale .row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 24px;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-row);
+  }
+  .type-scale .row:last-child { border-bottom: none; }
+  .type-scale .meta { color: var(--body-soft); font-size: 12px; font-family: var(--font-mono); }
+  .t-hero    { color: var(--heading); font-size: 36px; font-weight: 700; letter-spacing: -0.4px; line-height: 1.25; }
+  .t-section { color: var(--heading); font-size: 24px; font-weight: 600; letter-spacing: -0.2px; line-height: 1.30; }
+  .t-card    { color: var(--heading); font-size: 16px; font-weight: 600; line-height: 1.40; }
+  .t-body    { color: var(--body); font-size: 14px; font-weight: 400; line-height: 1.50; }
+  .t-caption { color: var(--caption); font-size: 12px; font-weight: 400; }
+  .t-code    { font-family: var(--font-mono); font-size: 13px; line-height: 1.50; color: var(--body); background: var(--surface-soft); padding: 2px 8px; border-radius: var(--r-sm); display: inline-block; }
+  .t-stat    { color: var(--heading); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ===== Color swatches ===== */
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .swatch {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 12px;
+    box-shadow: var(--shadow-card);
+  }
+  .chip {
+    width: 100%;
+    height: 56px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .swatch .name { color: var(--heading); font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .swatch .hex  { color: var(--body-soft); font-size: 11px; font-family: var(--font-mono); }
+
+  /* ===== Stats Strip ===== */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin: 0 auto;
+    max-width: 880px;
+  }
+  .stats-cell {
+    text-align: center;
+    padding: 18px 8px;
+    border-right: 1px solid var(--border);
+  }
+  .stats-cell:last-child { border-right: none; }
+  .stats-icon { color: var(--caption); font-size: 18px; margin-bottom: 6px; }
+  .stats-num  { color: var(--heading); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stats-label { color: var(--body-soft); font-size: 12px; margin-top: 4px; }
+
+  /* ===== Success Callout ===== */
+  .callout {
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    border-radius: var(--r-lg);
+    padding: 20px 24px;
+    margin: 32px auto 0;
+    max-width: 880px;
+  }
+  .callout-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--heading);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 12px;
+  }
+  .callout-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .callout-card {
+    background: var(--surface);
+    border: 1px solid var(--success-border);
+    border-radius: var(--r-md);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .callout-name { color: var(--heading); font-size: 13px; font-weight: 500; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--success-text);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .status-pill .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+  .callout-link { color: var(--brand-blue); font-size: 12px; text-decoration: none; }
+  .callout-disclaimer {
+    color: var(--body-soft);
+    font-size: 11px;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  /* ===== Footer line ===== */
+  .footer-line {
+    text-align: center;
+    color: var(--caption);
+    font-size: 14px;
+    margin-top: 96px;
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1024px) {
+    .card-grid { grid-template-columns: repeat(2, 1fr); }
+    .stats-strip { grid-template-columns: repeat(3, 1fr); }
+    .stats-cell:nth-child(3) { border-right: none; }
+  }
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 32px; letter-spacing: -0.3px; }
+    .hero { padding: 48px 0 32px; }
+    .section-heading { font-size: 24px; margin: 64px 0 24px; }
+    .card-grid { grid-template-columns: 1fr; }
+    .stats-strip { grid-template-columns: repeat(2, 1fr); }
+    nav { padding: 12px 16px; }
+    .nav-links { display: none; }
+    .wrap { padding: 0 16px 64px; }
+    .callout-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <nav>
+    <div class="brand">
+      <span class="mascot">⭐</span>
+      <span>SkillHub</span>
+    </div>
+    <div class="nav-links">
+      <a href="#">热榜</a>
+      <a href="#">全部技能</a>
+      <a href="#">AI 搭子<span class="new-tag">new</span></a>
+      <a href="#">关于</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-primary btn-sm" href="#">+ 发布 Skill</a>
+      <a class="btn btn-ghost btn-sm" href="#">登录</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-badge">🔥 专为中国用户优化的 AI Skills 社区</div>
+      <h1>装上这个 <span class="highlight">SkillHub</span>，解锁 AI 超能力</h1>
+      <p>精选推荐，高速下载体验，轻松查找 3.5 万 个 AI Skills</p>
+      <div class="btn-row">
+        <a class="btn btn-primary" href="#">○ 通过对话安装</a>
+        <a class="btn btn-ghost" href="#">&lt;/&gt; 命令行安装</a>
+      </div>
+
+      <div class="install-card">
+        <div class="install-tabs">
+          <div class="install-tab active">安装 SkillHub 并设为优先技能安装源 ⚡</div>
+          <div class="install-tab">安装 SkillHub</div>
+        </div>
+        <div class="install-body">
+          <div class="install-code">
+            复制提示词发送给你的 Agent，安装 CLI 并优先采用 SkillHub 加速安装技能<br>
+            根据 https://skillhub.cn/install/skillhub.md 安装 Skillhub 商店。
+            <span class="copy">⧉</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Cards -->
+    <h2 class="section-heading">收录 3.5 万 个 Skills，基于 SkillHub 轻松探索</h2>
+
+    <div class="search-row">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="搜索 skill 名称、描述" />
+      <a class="btn btn-primary" href="#">⊕ 探索全部技能</a>
+    </div>
+
+    <div class="card-grid">
+      <!-- Card 1 -->
+      <div class="card">
+        <h3 class="card-title">下载热榜 🔥</h3>
+
+        <div class="skill-row">
+          <div class="avatar av-green">S</div>
+          <div class="skill-info">
+            <div class="skill-name">self-improving-agent</div>
+            <div class="skill-meta">
+              <span class="tag tag-blue">AI增强</span>
+              <span>☆ 2.9千</span>
+              <span>↓ 52.1万</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-orange">S</div>
+          <div class="skill-info">
+            <div class="skill-name">Summarize</div>
+            <div class="skill-meta">
+              <span class="tag tag-orange">信息处理</span>
+              <span>☆ 712</span>
+              <span>↓ 38.6万</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-gray">F</div>
+          <div class="skill-info">
+            <div class="skill-name">Find Skills</div>
+            <div class="skill-meta">
+              <span class="tag tag-green">工具</span>
+              <span>☆ 1.0千</span>
+              <span>↓ 38.3万</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-gray">G</div>
+          <div class="skill-info">
+            <div class="skill-name">Github</div>
+            <div class="skill-meta">
+              <span class="tag tag-gray">开发工具</span>
+              <span>☆ 409</span>
+              <span>↓ 24.8万</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-purple">S</div>
+          <div class="skill-info">
+            <div class="skill-name">Self-Improving + Proactive Agent</div>
+            <div class="skill-meta">
+              <span class="tag tag-blue">AI增强</span>
+              <span>☆ 761</span>
+              <span>↓ 24.0万</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="card">
+        <h3 class="card-title">为你推荐</h3>
+
+        <div class="skill-row">
+          <div class="avatar av-green">S</div>
+          <div class="skill-info">
+            <div class="skill-name">self-improving-agent</div>
+            <div class="skill-meta">
+              <span class="tag tag-blue">AI增强</span>
+              <span>☆ 2.9千</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-gray">F</div>
+          <div class="skill-info">
+            <div class="skill-name">Find Skills</div>
+            <div class="skill-meta">
+              <span class="tag tag-green">工具</span>
+              <span>☆ 1.0千</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-orange">S</div>
+          <div class="skill-info">
+            <div class="skill-name">Summarize</div>
+            <div class="skill-meta">
+              <span class="tag tag-orange">信息处理</span>
+              <span>☆ 712</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-solid-purple">腾</div>
+          <div class="skill-info">
+            <div class="skill-name">腾讯文档 TENCENT DOCS</div>
+            <div class="skill-meta">
+              <span>☆ 28</span>
+              <span>↓ 4.1万</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-pink">A</div>
+          <div class="skill-info">
+            <div class="skill-name">Agent Browser</div>
+            <div class="skill-meta">
+              <span class="tag tag-pink">浏览器自动化</span>
+              <span>☆ 641</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="card">
+        <h3 class="card-title">最近上新</h3>
+
+        <div class="skill-row">
+          <div class="avatar av-blue">M</div>
+          <div class="skill-info">
+            <div class="skill-name">macOS 平台微信和 QQ 自动发消息工具</div>
+            <div class="skill-meta">
+              <span>☆ 0</span>
+              <span>↓ 0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-orange">微</div>
+          <div class="skill-info">
+            <div class="skill-name">微信读书评论、划线拉取</div>
+            <div class="skill-meta">
+              <span>☆ 0</span>
+              <span>↓ 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-solid-blue">✕</div>
+          <div class="skill-info">
+            <div class="skill-name">mark-heartflow-skill</div>
+            <div class="skill-meta">
+              <span>☆ 0</span>
+              <span>↓ 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-gray">C</div>
+          <div class="skill-info">
+            <div class="skill-name">customer-attack-plan</div>
+            <div class="skill-meta">
+              <span>☆ 0</span>
+              <span>↓ 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="skill-row">
+          <div class="avatar av-gray">C</div>
+          <div class="skill-info">
+            <div class="skill-name">cloud-channel-sales</div>
+            <div class="skill-meta">
+              <span>☆ 0</span>
+              <span>↓ 1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typography -->
+    <h2 class="section-heading">Typography</h2>
+    <div class="type-scale">
+      <div class="row"><span class="meta">Hero / 48 · 700</span><span class="t-hero">装上这个 SkillHub</span></div>
+      <div class="row"><span class="meta">Section / 32 · 600</span><span class="t-section">收录 3.5 万 个 Skills</span></div>
+      <div class="row"><span class="meta">Card / 16 · 600</span><span class="t-card">下载热榜 🔥</span></div>
+      <div class="row"><span class="meta">Body / 14 · 400</span><span class="t-body">精选推荐，高速下载体验，轻松查找 3.5 万 个 AI Skills。The quick brown fox jumps.</span></div>
+      <div class="row"><span class="meta">Caption / 12 · 400</span><span class="t-caption">☆ 2.9千 &nbsp;&nbsp; ↓ 52.1万 &nbsp;&nbsp; v0.1.0</span></div>
+      <div class="row"><span class="meta">Stat / 18 · 600</span><span class="t-stat">38.3万 &nbsp; 1.0千 &nbsp; 4.1万</span></div>
+      <div class="row"><span class="meta">Code / 13</span><span class="t-code">npx skills find [query]</span></div>
+    </div>
+
+    <!-- Color palette -->
+    <h2 class="section-heading">Color Palette</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background: var(--black)"></div><div class="name">CTA Surface</div><div class="hex">#ffffff (inverted)</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--brand-blue)"></div><div class="name">SkillHub Blue</div><div class="hex">#6e8bff (lifted)</div></div>
+      <div class="swatch"><div class="chip" style="background: linear-gradient(135deg, #1a0f08 0%, #1a1320 50%, #0e1224 100%)"></div><div class="name">Page Gradient</div><div class="hex">dark warm → cool</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--surface)"></div><div class="name">Surface</div><div class="hex">#171717</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--heading)"></div><div class="name">Heading</div><div class="hex">#fafafa</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--body)"></div><div class="name">Body</div><div class="hex">#d4d4d4</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--body-soft)"></div><div class="name">Body Soft</div><div class="hex">#a3a3a3</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--caption)"></div><div class="name">Caption</div><div class="hex">#737373</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--success)"></div><div class="name">Success</div><div class="hex">#34d399</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-orange)"></div><div class="name">Accent Orange</div><div class="hex">#ff8e60</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--tag-blue-bg)"></div><div class="name">Tag Blue</div><div class="hex">#1c2750</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--tag-orange-bg)"></div><div class="name">Tag Orange</div><div class="hex">#3a2814</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--tag-green-bg)"></div><div class="name">Tag Green</div><div class="hex">#143620</div></div>
+      <div class="swatch"><div class="chip" style="background: var(--tag-pink-bg)"></div><div class="name">Tag Pink</div><div class="hex">#3a1a26</div></div>
+    </div>
+
+    <!-- Stats strip + Callout -->
+    <h2 class="section-heading">Stats &amp; Safety Callout</h2>
+    <div class="stats-strip">
+      <div class="stats-cell"><div class="stats-icon">◆</div><div class="stats-num">ClawHub</div><div class="stats-label">源自</div></div>
+      <div class="stats-cell"><div class="stats-icon">ⓘ</div><div class="stats-num">V 0.1.0</div><div class="stats-label">版本</div></div>
+      <div class="stats-cell"><div class="stats-icon">◈</div><div class="stats-num">通过</div><div class="stats-label">安全检测</div></div>
+      <div class="stats-cell"><div class="stats-icon">↓</div><div class="stats-num">38.3万</div><div class="stats-label">下载量</div></div>
+      <div class="stats-cell"><div class="stats-icon">★</div><div class="stats-num">1.0千</div><div class="stats-label">收藏</div></div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">🛡️ 安全检测</div>
+      <div class="callout-row">
+        <div class="callout-card">
+          <div>
+            <span class="callout-name">科恩实验室</span>
+            <span class="status-pill" style="margin-left: 12px;"><span class="dot"></span>安全，无风险</span>
+          </div>
+          <a class="callout-link" href="#">查看报告 ↗</a>
+        </div>
+        <div class="callout-card">
+          <div>
+            <span class="callout-name">云鼎实验室</span>
+            <span class="status-pill" style="margin-left: 12px;"><span class="dot"></span>安全，无风险</span>
+          </div>
+          <a class="callout-link" href="#">查看报告 ↗</a>
+        </div>
+      </div>
+      <div class="callout-disclaimer">
+        安全检测结果由第三方机构出具，仅作参考，不构成平台对 Skill 绝对安全的承诺。网络安全具有动态性，请您自行做好安全防护和风险管控。
+      </div>
+    </div>
+
+    <div class="footer-line">📝 谨此向 ClawHub 和 OpenClaw 项目致以诚挚谢意</div>
+
+  </div>
+</body>
+</html>
