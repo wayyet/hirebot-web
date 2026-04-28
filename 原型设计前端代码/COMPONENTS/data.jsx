@@ -1,7 +1,19 @@
 /* global window */
-// === Mock data + small store ===
+// === Mock data + lightweight stores ===
 
-const TINTS = ["green","orange","blue","purple","pink","gray"];
+const TINTS = ["green", "orange", "blue", "purple", "pink", "gray"];
+const IM_BINDING_STORAGE_KEY = "ncrew.im.bindings.v2";
+
+const VIEWER_META = {
+  manager: { name: "李部门长", short: "李", dept: "研发部" },
+  member: { name: "王成员", short: "王", dept: "研发部" }
+};
+
+const IM_CHANNEL_META = {
+  lark: { name: "飞书", short: "飞", accent: "blue" },
+  dingding: { name: "钉", short: "钉", accent: "orange" },
+  wecom: { name: "企微", short: "企", accent: "green" }
+};
 
 const TEMPLATES = [
   {
@@ -24,7 +36,7 @@ const TEMPLATES = [
       "不直接对外发送 offer 与合同",
       "不替代背调或法律意见"
     ],
-    tags: ["AI增强","信息处理"]
+    tags: ["AI增强", "信息处理"]
   },
   {
     id: "tpl_contract",
@@ -46,7 +58,7 @@ const TEMPLATES = [
       "不替代律师签署",
       "不提供管辖法域之外的意见"
     ],
-    tags: ["信息处理","工具"]
+    tags: ["信息处理", "工具"]
   },
   {
     id: "tpl_qa",
@@ -68,7 +80,7 @@ const TEMPLATES = [
       "不直接处罚员工",
       "不修改 CRM 工单"
     ],
-    tags: ["信息处理","工具"]
+    tags: ["信息处理", "工具"]
   },
   {
     id: "tpl_lead",
@@ -90,7 +102,7 @@ const TEMPLATES = [
       "不直接联系客户",
       "不修改公海规则"
     ],
-    tags: ["AI增强","工具"]
+    tags: ["AI增强", "工具"]
   },
   {
     id: "tpl_research",
@@ -112,7 +124,7 @@ const TEMPLATES = [
       "不发布对外文章",
       "不进行交易性建议"
     ],
-    tags: ["信息处理","AI增强"]
+    tags: ["信息处理", "AI增强"]
   },
   {
     id: "tpl_finops",
@@ -134,12 +146,10 @@ const TEMPLATES = [
       "不直接审批付款",
       "不替代税务申报"
     ],
-    tags: ["信息处理","开发工具"]
+    tags: ["信息处理", "开发工具"]
   }
 ];
 
-// Department-version employees (部门员工) — what's in 部门数字员工
-// statuses: hired | interning_ai | interning_human | live | failed | retired
 const DEPT_EMPLOYEES = [
   {
     id: "de_hr_2024",
@@ -153,7 +163,7 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "2 小时前",
-    tags: ["AI增强","HR"],
+    tags: ["AI增强", "HR"],
     runs: 128,
     cloned: 12,
     activeAt: "刚刚"
@@ -204,10 +214,10 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "昨天",
-    tags: ["AI增强","工具"],
+    tags: ["AI增强", "工具"],
     runs: 0,
     cloned: 0,
-    hireProgress: 4 // step index
+    hireProgress: 4
   },
   {
     id: "de_research_2024",
@@ -245,11 +255,10 @@ const DEPT_EMPLOYEES = [
   }
 ];
 
-// 我的数字员工 — owned by current user (mix of clones, branches, and dept-owned for 部门长)
 const MY_EMPLOYEES = [
   {
     id: "pc_hr_li",
-    type: "personal_clone", // 我的分身
+    type: "personal_clone",
     name: "招聘小慧 · 李工",
     initial: "李",
     tint: "blue",
@@ -260,13 +269,17 @@ const MY_EMPLOYEES = [
     desc: "我的招聘助手，记得我经常招后端 / 算法两类岗位。",
     owner: "李部门长",
     updated: "今天 14:08",
-    tags: ["我的分身","HR"],
+    tags: ["我的分身", "HR"],
     runs: 42,
-    activeAt: "12 分钟前"
+    activeAt: "12 分钟前",
+    seedBindings: {
+      lark: { channelId: "lark", methodId: "websocket", status: "connected", connectedAt: "今天 14:08", form: { appId: "demo_lark_app", appSecret: "••••••••" } },
+      dingding: { channelId: "dingding", methodId: "callback", status: "connected", connectedAt: "昨天 18:22", form: { appId: "demo_ding", appSecret: "••••••••", secretEncryptKey: "••••", token: "demo-token" } }
+    }
   },
   {
     id: "pb_hr_li_offer",
-    type: "private_branch", // 私人定制
+    type: "private_branch",
     name: "招聘小慧 · 我的 Offer 版",
     initial: "Of",
     tint: "purple",
@@ -291,12 +304,15 @@ const MY_EMPLOYEES = [
     parentName: "行业小研",
     template: "tpl_research",
     status: "live",
-    desc: "每周一早上把 AI Infra 赛道周报推送到我的飞书。",
+    desc: "每周一早上把 AI Infra 赛道周报推送给我，站内对话也会保留追问历史。",
     owner: "李部门长",
     updated: "昨天",
-    tags: ["我的分身"],
+    tags: ["我的分身", "情报"],
     runs: 19,
-    activeAt: "今天 08:00"
+    activeAt: "今天 08:00",
+    seedBindings: {
+      wecom: { channelId: "wecom", methodId: "websocket", status: "connected", connectedAt: "昨天 09:40", form: { appId: "demo_wecom", appSecret: "••••••••" } }
+    }
   },
   {
     id: "pc_qa_old",
@@ -314,14 +330,51 @@ const MY_EMPLOYEES = [
     tags: ["历史"],
     runs: 230,
     activeAt: "—"
+  },
+  {
+    id: "pc_hr_wang",
+    type: "personal_clone",
+    name: "招聘小慧 · 小王",
+    initial: "王",
+    tint: "green",
+    parent: "de_hr_2024",
+    parentName: "招聘小慧",
+    template: "tpl_hr_assist",
+    status: "live",
+    desc: "保留我常用的面试纪要格式，适合做初筛和会后整理。",
+    owner: "王成员",
+    updated: "今天 13:20",
+    tags: ["我的分身", "研发招聘"],
+    runs: 17,
+    activeAt: "5 分钟前",
+    seedBindings: {
+      lark: { channelId: "lark", methodId: "websocket", status: "connected", connectedAt: "今天 13:20", form: { appId: "member_lark", appSecret: "••••••••" } }
+    }
+  },
+  {
+    id: "pb_hr_wang_offer",
+    type: "private_branch",
+    name: "招聘小慧 · 面试官协同版",
+    initial: "协",
+    tint: "orange",
+    parent: "pc_hr_wang",
+    parentName: "招聘小慧 · 小王",
+    template: "tpl_hr_assist",
+    status: "failed",
+    desc: "尝试加入面试官协同评分逻辑，但在人工评估中暴露了边界问题。",
+    owner: "王成员",
+    updated: "今天 09:45",
+    tags: ["私人定制", "待回退"],
+    runs: 0,
+    failedReason: "能力生成"
   }
 ];
 
 const STATUS_LABEL = {
   hired: { text: "已雇佣", cls: "hired", desc: "等待进入评估" },
   interning_ai: { text: "AI 评估中", cls: "ai", desc: "AI 自动化评估" },
-  interning_human: { text: "人工评估中", cls: "human", desc: "用户在飞书轮次评估" },
-  live: { text: "已上岗", cls: "live", desc: "可在飞书私聊使用" },
+  interning_human: { text: "人工评估中", cls: "human", desc: "用户在场景轮次中评估" },
+  live: { text: "已上岗", cls: "live", desc: "可在站内对话或 IM 中使用" },
   failed: { text: "评估失败", cls: "failed", desc: "等待 Review 决策" },
   retired: { text: "已退役", cls: "retired", desc: "只读" }
 };
@@ -333,7 +386,6 @@ const TYPE_LABEL = {
   private_branch: "私人定制"
 };
 
-// Hire flow steps
 const HIRE_STEPS = [
   { id: "scene", title: "场景匹配", hint: "目标场景 / 用户 / 任务 / 模板适配度" },
   { id: "gap", title: "差距挖掘", hint: "知识缺口 / 能力缺口 / 外部系统 / 禁做边界" },
@@ -343,16 +395,165 @@ const HIRE_STEPS = [
   { id: "external", title: "外部对接", hint: "系统清单 / 认证 / 连通性测试" }
 ];
 
-// Department + my employees combined helper
+function cloneObject(source) {
+  return source ? JSON.parse(JSON.stringify(source)) : source;
+}
+
 function findEmployeeById(id) {
   return DEPT_EMPLOYEES.find(e => e.id === id) || MY_EMPLOYEES.find(e => e.id === id);
 }
+
 function findTemplateById(id) {
   return TEMPLATES.find(t => t.id === id);
 }
 
+function getViewer(role) {
+  return VIEWER_META[role] || VIEWER_META.manager;
+}
+
+function getMyEmployeesForRole(role) {
+  const viewer = getViewer(role);
+  return MY_EMPLOYEES.filter(e => e.owner === viewer.name);
+}
+
+function updateEmployee(id, patch) {
+  const target = findEmployeeById(id);
+  if (!target) return null;
+  Object.assign(target, patch);
+  return target;
+}
+
+function generateId(prefix) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function uniqueName(base, list) {
+  const normalized = base.trim();
+  if (!list.some(item => item.name === normalized)) return normalized;
+  let idx = 2;
+  while (list.some(item => item.name === `${normalized} ${idx}`)) idx += 1;
+  return `${normalized} ${idx}`;
+}
+
+function addDepartmentEmployee(payload) {
+  const next = {
+    runs: 0,
+    cloned: 0,
+    dept: "研发部",
+    owner: "李部门长",
+    updated: "刚刚",
+    tags: [],
+    ...payload
+  };
+  DEPT_EMPLOYEES.unshift(next);
+  return next;
+}
+
+function addMyEmployee(payload) {
+  const next = {
+    runs: 0,
+    updated: "刚刚",
+    tags: [],
+    ...payload
+  };
+  MY_EMPLOYEES.unshift(next);
+  return next;
+}
+
+function readIMStore() {
+  if (window.__NCREW_IM_BINDINGS__) return window.__NCREW_IM_BINDINGS__;
+  try {
+    const raw = window.localStorage && window.localStorage.getItem(IM_BINDING_STORAGE_KEY);
+    window.__NCREW_IM_BINDINGS__ = raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    window.__NCREW_IM_BINDINGS__ = {};
+  }
+  return window.__NCREW_IM_BINDINGS__;
+}
+
+function writeIMStore(nextStore) {
+  window.__NCREW_IM_BINDINGS__ = nextStore;
+  try {
+    if (window.localStorage) window.localStorage.setItem(IM_BINDING_STORAGE_KEY, JSON.stringify(nextStore));
+  } catch (err) {}
+}
+
+function buildSeedBindings(employee) {
+  return cloneObject((employee && employee.seedBindings) || {});
+}
+
+function getEmployeeBindings(employeeId) {
+  const store = readIMStore();
+  if (store[employeeId]) return cloneObject(store[employeeId]);
+  const seeded = buildSeedBindings(findEmployeeById(employeeId));
+  store[employeeId] = seeded;
+  writeIMStore(store);
+  return cloneObject(seeded);
+}
+
+function getBinding(employeeId, channelId) {
+  return getEmployeeBindings(employeeId)[channelId] || null;
+}
+
+function saveEmployeeBinding(employeeId, channelId, binding) {
+  const store = readIMStore();
+  const current = store[employeeId] ? cloneObject(store[employeeId]) : buildSeedBindings(findEmployeeById(employeeId));
+  current[channelId] = binding;
+  writeIMStore({ ...store, [employeeId]: current });
+  return current[channelId];
+}
+
+function removeEmployeeBinding(employeeId, channelId) {
+  const store = readIMStore();
+  const current = store[employeeId] ? cloneObject(store[employeeId]) : buildSeedBindings(findEmployeeById(employeeId));
+  delete current[channelId];
+  writeIMStore({ ...store, [employeeId]: current });
+  return current;
+}
+
+function getBindingStatus(employeeId, channelId) {
+  const binding = getBinding(employeeId, channelId);
+  return binding ? (binding.status || "connected") : "unconfigured";
+}
+
+function getConnectedChannels(employeeId) {
+  const bindings = getEmployeeBindings(employeeId);
+  return Object.keys(bindings).filter(channelId => bindings[channelId] && bindings[channelId].status !== "error");
+}
+
+function formatNow() {
+  try {
+    return new Date().toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch (err) {
+    return "刚刚";
+  }
+}
+
 Object.assign(window, {
-  TEMPLATES, DEPT_EMPLOYEES, MY_EMPLOYEES,
-  STATUS_LABEL, TYPE_LABEL, HIRE_STEPS, TINTS,
-  findEmployeeById, findTemplateById
+  TEMPLATES,
+  DEPT_EMPLOYEES,
+  MY_EMPLOYEES,
+  STATUS_LABEL,
+  TYPE_LABEL,
+  HIRE_STEPS,
+  TINTS,
+  VIEWER_META,
+  IM_CHANNEL_META,
+  findEmployeeById,
+  findTemplateById,
+  getViewer,
+  getMyEmployeesForRole,
+  updateEmployee,
+  addDepartmentEmployee,
+  addMyEmployee,
+  generateId,
+  uniqueName,
+  cloneObject,
+  getEmployeeBindings,
+  getBinding,
+  getBindingStatus,
+  getConnectedChannels,
+  saveEmployeeBinding,
+  removeEmployeeBinding,
+  formatNow
 });

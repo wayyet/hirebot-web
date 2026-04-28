@@ -65,6 +65,10 @@ function AIEvalPage({ id, go, toast }) {
           <span>🧪 测试用例 36 个</span>
           <span>⏱ 预计剩余 {running ? "00:36" : "—"}</span>
         </div>
+        <div className="spacer-12"/>
+        <div className="callout info">
+          衔接检查已通过，当前评估基于完整实例配置继续执行。若雇佣阶段缺失本体测试用例，原型会在这里提示补充生成路径。
+        </div>
       </div>
 
       <div className="spacer-24"/>
@@ -153,7 +157,7 @@ function HumanEvalPage({ id, go, toast }) {
           {!allDone
             ? <button className="btn btn-primary" disabled>请先完成每个场景判定</button>
             : allPass
-              ? <button className="btn btn-primary" onClick={() => { toast("人工评估通过 · 配置飞书身份"); go(`onboard/${e.id}`); }}>通过并上岗 <window.Icon.arrow className="icn"/></button>
+              ? <button className="btn btn-primary" onClick={() => { toast("人工评估通过 · 进入发布确认"); go(`publish/${e.id}`); }}>通过并上岗 <window.Icon.arrow className="icn"/></button>
               : <button className="btn btn-primary" onClick={() => go(`review/${e.id}`)}>有不通过 · 进入 Review</button>}
         </div>
       </div>
@@ -198,7 +202,7 @@ function HumanEvalPage({ id, go, toast }) {
             <div className="muted" style={{fontSize:12, marginBottom:6}}>评估结论</div>
             <div style={{fontSize:14, lineHeight:1.6}}>
               {allDone
-                ? (allPass ? "所有场景通过，可进入飞书身份配置并上岗。" : "存在场景未通过，建议进入 Review 决定回退工位。强制上岗需要二次确认。")
+                ? (allPass ? "所有场景通过，可进入 IM 通道配置并上岗。" : "存在场景未通过，建议进入 Review 决定回退工位。强制上岗需要二次确认。")
                 : "请先在上方完成每个场景的人工判定。"}
             </div>
           </div>

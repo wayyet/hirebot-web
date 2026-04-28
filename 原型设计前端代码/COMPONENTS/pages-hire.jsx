@@ -6,6 +6,8 @@ function HirePage({ id, tpl, go, toast }) {
   // Determine source: continuing existing hired emp, or starting new from template
   const existing = id ? window.findEmployeeById(id) : null;
   const template = tpl ? window.findTemplateById(tpl) : (existing ? window.findTemplateById(existing.template) : window.TEMPLATES[0]);
+  const isBranchFlow = !!existing && existing.type === "private_branch";
+  const backTo = isBranchFlow ? "my" : "dept";
 
   const [step, setStep] = _useStateH(existing ? Math.min(existing.hireProgress || 0, 5) : 0);
   const [confirmed, setConfirmed] = _useStateH(() => {
@@ -26,6 +28,7 @@ function HirePage({ id, tpl, go, toast }) {
   function confirmStep() {
     setConfirmed({ ...confirmed, [cur.id]: true });
     setChat(c => [...c, { who: "me", text: "确认本步结果" }, { who: "bot", text: stepBotReply(step + 1) }]);
+    if (existing) window.updateEmployee(existing.id, { hireProgress: Math.min(step + 1, window.HIRE_STEPS.length), updated: "刚刚" });
     if (step < 5) setStep(step + 1);
     toast("已确认 · 进入下一步");
   }
@@ -44,15 +47,19 @@ function HirePage({ id, tpl, go, toast }) {
 
   return (
     <div className="page">
-      <window.Crumb label="返回部门数字员工" onClick={() => go("dept")} />
+      <window.Crumb label={`返回${isBranchFlow ? "我的数字员工" : "部门数字员工"}`} onClick={() => go(backTo)} />
 
       <div className="page-header">
         <div>
-          <h1 className="page-title">部门版雇佣 · <em>{template.name}</em></h1>
-          <p className="page-sub">六步流程按步骤生成并确认中间产物。支持保存退出，从「部门数字员工 / 已雇佣」恢复。</p>
+          <h1 className="page-title">{isBranchFlow ? "私有分支定制" : "部门版雇佣"} · <em>{template.name}</em></h1>
+          <p className="page-sub">
+            {isBranchFlow
+              ? "这里复用与部门版一致的六步流程，最终发布目标改为“我的数字员工”里的私人定制分支。"
+              : "六步流程按步骤生成并确认中间产物。支持保存退出，从「部门数字员工 / 已雇佣」恢复。"}
+          </p>
         </div>
         <div className="row">
-          <button className="btn btn-ghost btn-sm" onClick={() => { toast("已保存草稿"); go("dept"); }}>保存退出</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { toast("已保存草稿"); go(backTo); }}>保存退出</button>
           {allDone
             ? <button className="btn btn-primary btn-sm" onClick={() => go(`eval-ai/${existing ? existing.id : "de_lead_2024"}`)}>进入 AI 评估 →</button>
             : <button className="btn btn-primary btn-sm" onClick={confirmStep}>确认本步结果 →</button>}
