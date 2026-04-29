@@ -400,17 +400,41 @@ function Crumb({ label, onClick }) {
   );
 }
 
-function StepsBar({ steps, current }) {
+function StepsBar({ steps, current, view = current, onStepClick, isStepClickable, isStepConfirmed }) {
   return (
     <div className="steps">
       {steps.map((step, idx) => {
-        const cls = idx < current ? "done" : idx === current ? "active" : "";
+        const classes = [];
+        const clickable = typeof onStepClick === "function" && (typeof isStepClickable === "function" ? isStepClickable(idx) : idx <= current);
+        const confirmed = typeof isStepConfirmed === "function" ? isStepConfirmed(idx) : idx < current;
+        let stateLabel = "";
+        if (idx < current) classes.push("done");
+        if (idx === current) classes.push("active");
+        if (idx === view && idx !== current) classes.push("viewing");
+        if (clickable) classes.push("clickable");
+        if (idx === view && idx !== current) stateLabel = "回看中";
+        else if (idx === current) stateLabel = confirmed ? "已确认" : "进行中";
+        else if (confirmed) stateLabel = "已确认";
+        const content = (
+          <>
+            <span className="num">{idx + 1}</span>
+            <span className="step-copy">
+              <span className="step-title">{step.title}</span>
+              {stateLabel && <span className="step-state">{stateLabel}</span>}
+            </span>
+          </>
+        );
         return (
           <React.Fragment key={step.id}>
-            <div className={`step ${cls}`}>
-              <span className="num">{idx + 1}</span>
-              <span>{step.title}</span>
-            </div>
+            {clickable ? (
+              <button type="button" className={`step ${classes.join(" ")}`} onClick={() => onStepClick(idx)}>
+                {content}
+              </button>
+            ) : (
+              <div className={`step ${classes.join(" ")}`}>
+                {content}
+              </div>
+            )}
             {idx < steps.length - 1 && <span className="step-arrow">→</span>}
           </React.Fragment>
         );

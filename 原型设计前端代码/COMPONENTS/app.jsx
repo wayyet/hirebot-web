@@ -55,8 +55,10 @@ function App() {
   else if (route.startsWith("branch/")) page = <window.BranchPage id={route.split("/")[1]} role={role} go={go} toast={toast} />;
   else page = <window.TemplatesPage go={go} />;
 
+  const appClassName = route === "templates" ? "app app-homepage" : "app";
+
   return (
-    <div className="app">
+    <div className={appClassName}>
       <window.TopNav role={role} setRole={setRole} route={route} go={go} />
       {page}
       <window.ToastHost toasts={toasts} />
