@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m http.server 3000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/index.html)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \"3000\")",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/\" -UseBasicParsing -TimeoutSec 3; $r.StatusCode } catch { $_.Exception.Message })",
+      "Bash(git -C \"d:/zhiyong/公司项目/ncrew/雇佣端原型设计\" status)",
+      "Bash(git -C \"d:/zhiyong/公司项目/ncrew/雇佣端原型设计\" diff --stat)",
+      "Bash(git -C \"d:/zhiyong/公司项目/ncrew/雇佣端原型设计\" status --short)"
+    ]
+  }
+}
