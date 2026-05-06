@@ -156,12 +156,23 @@ function DeptPage({ role, go }) {
         </div>
       ) : (
         <div className="grid grid-3">
-          {list.map(employee => (
+          {list.map(employee => {
+            // 待实习状态的员工点击卡片直接进入对应的评估页面
+            const handleClick = () => {
+              if (employee.status === "interning_ai") {
+                go(`eval-ai/${employee.id}`);
+              } else if (employee.status === "interning_human") {
+                go(`eval-human/${employee.id}`);
+              } else {
+                go(`employee/${employee.id}`);
+              }
+            };
+            return (
             <window.EmployeeCard
               key={employee.id}
               emp={employee}
-              onClick={() => go(`employee/${employee.id}`)}
-              cardHint={isManager && employee.status === "live" ? "已上岗员工支持“快捷复制”，但卡片主动作仍然统一进入详情页。" : (!isManager ? "卡片进入详情页后可创建你的个人分身。" : "")}
+              onClick={handleClick}
+              cardHint={isManager && employee.status === "live" ? `已上岗员工支持"快捷复制"，但卡片主动作仍然统一进入详情页。` : (!isManager ? "卡片进入详情页后可创建你的个人分身。" : "")}
               footerActions={(
                 <div className="action-row">
                   {isManager && employee.status === "live" && (
@@ -169,11 +180,23 @@ function DeptPage({ role, go }) {
                       快捷复制
                     </button>
                   )}
-                  <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>查看详情 →</button>
+                  {employee.status === "interning_ai" && (
+                    <button className="btn btn-primary btn-sm" onClick={evt => { evt.stopPropagation(); go(`eval-ai/${employee.id}`); }}>
+                      进入 AI 评估
+                    </button>
+                  )}
+                  {employee.status === "interning_human" && (
+                    <button className="btn btn-primary btn-sm" onClick={evt => { evt.stopPropagation(); go(`eval-human/${employee.id}`); }}>
+                      进入人工评估
+                    </button>
+                  )}
+                  {employee.status !== "interning_ai" && employee.status !== "interning_human" && (
+                    <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>查看详情 →</button>
+                  )}
                 </div>
               )}
             />
-          ))}
+          )})}
         </div>
       )}
     </div>
@@ -221,8 +244,13 @@ function MyPage({ role, go }) {
     }
 
     if (employee.status === "interning_ai" || employee.status === "interning_human") {
+      const targetRoute = employee.status === "interning_ai" ? `eval-ai/${employee.id}` : `eval-human/${employee.id}`;
+      const label = employee.status === "interning_ai" ? "进入 AI 评估" : "进入人工评估";
       return (
         <div className="action-row">
+          <button className="btn btn-primary btn-sm" onClick={evt => { evt.stopPropagation(); go(targetRoute); }}>
+            {label}
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>查看进度</button>
         </div>
       );
@@ -251,7 +279,7 @@ function MyPage({ role, go }) {
         <div>
           <span className="eyebrow">{viewer.name} 的个人资产</span>
           <h1 className="page-title">我的数字员工</h1>
-          <p className="page-sub">这里只展示你本人拥有的“我的分身”和“私人定制”。`live` 卡片主动作统一改为“开始对话”，直接进入站内会话。</p>
+          <p className="page-sub">这里只展示你本人拥有的"我的分身"和"私人定制"。`live` 卡片主动作统一改为"开始对话"，直接进入站内会话。</p>
         </div>
         <button className="btn btn-ghost" onClick={() => go("dept")}>
           去部门数字员工 复制一个 →
@@ -280,15 +308,28 @@ function MyPage({ role, go }) {
         <div className="empty">
           <div className="ic">🗂</div>
           <h4>当前筛选下没有你的个人资产</h4>
-          <p>先去“部门数字员工”复制一个 `live` 员工给自己，回来这里就能开始对话或继续定制。</p>
+          <p>先去"部门数字员工"复制一个 `live` 员工给自己，回来这里就能开始对话或继续定制。</p>
         </div>
       ) : (
         <div className="grid grid-3">
-          {list.map(employee => (
+          {list.map(employee => {
+            // 待实习状态的员工点击卡片直接进入对应的评估页面
+            const handleClick = () => {
+              if (employee.status === "live") {
+                go(`chat/${employee.id}`);
+              } else if (employee.status === "interning_ai") {
+                go(`eval-ai/${employee.id}`);
+              } else if (employee.status === "interning_human") {
+                go(`eval-human/${employee.id}`);
+              } else {
+                go(`employee/${employee.id}`);
+              }
+            };
+            return (
             <window.EmployeeCard
               key={employee.id}
               emp={employee}
-              onClick={() => go(employee.status === "live" ? `chat/${employee.id}` : `employee/${employee.id}`)}
+              onClick={handleClick}
               extraPanel={(
                 <div className="inline-panel">
                   <div className="inline-panel-title">IM 接入状态</div>
@@ -298,7 +339,7 @@ function MyPage({ role, go }) {
               cardHint={employee.status === "live" ? "主动作已切换为站内对话；详情和 IM 配置保留为次要动作。" : ""}
               footerActions={renderFooter(employee)}
             />
-          ))}
+          )})}
         </div>
       )}
 
