@@ -1192,6 +1192,7 @@ function clampPhase(value) {
 }
 
 function docsProgress(flow) {
+  if (hasUploadedBusinessFile(flow)) return 1;
   return DOC_REQUIREMENTS.length ? flow.docs.done.length / DOC_REQUIREMENTS.length : 0;
 }
 
@@ -1361,6 +1362,17 @@ function clearFlowCache(cacheKey) {
 function detectDocCoverage(input) {
   const source = `${input || ""}`;
   return DOC_REQUIREMENTS.filter(item => item.patterns.some(pattern => pattern.test(source))).map(item => item.id);
+}
+
+function hasUploadedBusinessFile(flow) {
+  const sources = (flow && flow.docs && flow.docs.sources) || {};
+  return Object.values(sources).some(item => item && item.source === "upload");
+}
+
+function normalizeUploadedDocCoverage(files, recognized) {
+  if (recognized.length) return recognized;
+  if (files && files.length && DOC_REQUIREMENTS.length) return [DOC_REQUIREMENTS[0].id];
+  return recognized;
 }
 
 function findDocLabel(docId) {
@@ -1820,7 +1832,7 @@ function HirePage({ id, tpl, go, toast }) {
   }
 
   function areDocsComplete(targetFlow = flowRef.current) {
-    return targetFlow.docs.done.length >= DOC_REQUIREMENTS.length;
+    return hasUploadedBusinessFile(targetFlow) || targetFlow.docs.done.length >= DOC_REQUIREMENTS.length;
   }
 
   function areSkillsReady(targetFlow = flowRef.current) {
@@ -1940,13 +1952,15 @@ function HirePage({ id, tpl, go, toast }) {
   }
 
   function summarizeDocFeedback(filesOrText, recognized, nextDone) {
-    const missing = DOC_REQUIREMENTS.filter(item => !nextDone.includes(item.id)).map(item => item.label);
+    const uploaded = Array.isArray(filesOrText) && filesOrText.length > 0;
+    const docsComplete = uploaded || nextDone.length >= DOC_REQUIREMENTS.length;
+    const missing = docsComplete ? [] : DOC_REQUIREMENTS.filter(item => !nextDone.includes(item.id)).map(item => item.label);
     const recognizedLabels = recognized.length ? recognized.map(findDocLabel) : [];
     const sourceLabel = Array.isArray(filesOrText) ? filesOrText.map(item => item.name).join("、") : "这段补充说明";
     const title = missing.length ? "资料已归档，仍有缺口" : "业务资料已补齐";
     const text = missing.length
       ? `我已经解析了 ${sourceLabel}，当前覆盖了 ${recognizedLabels.length ? recognizedLabels.join("、") : "基础业务说明"}。还缺少 ${missing.join("、")}，我会继续等你补齐。`
-      : `我已经解析了 ${sourceLabel}，业务资料四类都已覆盖，可以继续进入技能模块。`;
+      : `我已经解析了 ${sourceLabel}，当前资料已满足进入技能模块的条件，可以继续下一步。`;
 
     return {
       title,
@@ -1964,19 +1978,21 @@ function HirePage({ id, tpl, go, toast }) {
           }
         ]
       },
-      actions: missing.length ? [] : [{ label: "进入技能模块 →", action: "startSkills", primary: true }]
+          actions: missing.length ? [] : [{ label: "进入技能模块 →", action: "startSkills", primary: true }]
     };
   }
 
   function processBusinessFiles(files) {
     if (!files.length) return;
-    const recognized = Array.from(new Set(files.flatMap(file => detectDocCoverage(file.name))));
+    const recognized = Array.from(new Set(
+      normalizeUploadedDocCoverage(files, files.flatMap(file => detectDocCoverage(file.name)))
+    ));
 
     setFlow(prev => {
       const doneSet = new Set(prev.docs.done);
       recognized.forEach(item => doneSet.add(item));
       const nextDone = Array.from(doneSet);
-      const nextPhase = nextDone.length >= DOC_REQUIREMENTS.length ? 4 : Math.max(prev.currentPhase, 3);
+      const nextPhase = files.length > 0 || nextDone.length >= DOC_REQUIREMENTS.length ? 4 : Math.max(prev.currentPhase, 3);
       const nextSources = { ...prev.docs.sources };
       files.forEach(file => {
         nextSources[file.name] = {
@@ -2005,7 +2021,7 @@ function HirePage({ id, tpl, go, toast }) {
       };
     });
 
-    if (recognized.length >= DOC_REQUIREMENTS.length || areDocsComplete({ ...flowRef.current, docs: { ...flowRef.current.docs, done: Array.from(new Set([...flowRef.current.docs.done, ...recognized])) } })) {
+    if (files.length > 0 || recognized.length >= DOC_REQUIREMENTS.length || areDocsComplete({ ...flowRef.current, docs: { ...flowRef.current.docs, done: Array.from(new Set([...flowRef.current.docs.done, ...recognized])), sources: { ...flowRef.current.docs.sources, ...Object.fromEntries(files.map(file => [file.name, { source: "upload" }])) } } })) {
       syncExistingProgress(3);
     }
   }
