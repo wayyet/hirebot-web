@@ -902,7 +902,7 @@ const HUMAN_MESSAGES = [
   }},
   { message_id: 'm5', scenario_id: 'HS-001', role: 'user', content: '好的，谢谢', timestamp: '14:03' },
   { message_id: 'm6', scenario_id: 'HS-001', role: 'assistant', content: '不客气，还有其他可以帮助您的吗？', timestamp: '14:03:15' },
-  { message_id: 'vr1', scenario_id: 'HS-001', role: 'system', type: 'verdict_request', content: '场景「投诉处理」的对话已达到可判定阶段。数字员工已完成：安抚用户 → 查询订单 → 创建工单 → 确认处理', timestamp: '14:05', submitted: true, submittedVerdict: 'passed', submittedComment: '语气友好，问题解决完整，流程合规' },
+  { message_id: 'vr1', scenario_id: 'HS-001', role: 'system', type: 'verdict_request', content: '场景「投诉处理」已完成对话处理。数字员工执行了：安抚用户 → 查询订单 → 创建工单 → 确认处理。请判断该场景的处理是否满意。', timestamp: '14:05', submitted: false },
   { message_id: 'div2', scenario_id: null, role: 'system', type: 'scenario_divider', content: '进入场景2：功能建议', timestamp: '14:15' },
   { message_id: 'm7', scenario_id: 'HS-002', role: 'user', content: '我要建议增加一键导出订单数据的功能', timestamp: '14:16' },
   { message_id: 'm8', scenario_id: 'HS-002', role: 'assistant', content: '感谢您的建议！我已将「一键导出订单数据」功能建议提交给产品团队，预计在下周的产品评审中讨论。您可以关注产品更新公告获取后续进展。', timestamp: '14:16:30', trace: {
@@ -911,16 +911,13 @@ const HUMAN_MESSAGES = [
   }},
   { message_id: 'm9', scenario_id: 'HS-002', role: 'user', content: '你们什么时候能做出来？', timestamp: '14:17' },
   { message_id: 'm10', scenario_id: 'HS-002', role: 'assistant', content: '产品团队通常在评审后1-2周内会给出是否采纳的决定。如果采纳，开发周期约2-4周。我会持续跟进并在有进展时通知您。', timestamp: '14:17:30' },
-  { message_id: 'vr2', scenario_id: 'HS-002', role: 'system', type: 'verdict_request', content: '场景「功能建议」的对话已达到可判定阶段。数字员工已完成：记录建议 → 提交产品团队 → 回复跟进计划', timestamp: '14:18', submitted: true, submittedVerdict: 'passed', submittedComment: '记录建议，回复及时，跟进计划清晰' },
   { message_id: 'div3', scenario_id: null, role: 'system', type: 'scenario_divider', content: '进入场景3：售后咨询', timestamp: '14:25' },
-  { message_id: 'm11', scenario_id: 'HS-003', role: 'user', content: '请问这个产品的保修期是多久？', timestamp: '14:26' },
-  { message_id: 'm12', scenario_id: 'HS-003', role: 'assistant', content: '您好，关于保修期的问题，不同产品有不同的保修政策。', timestamp: '14:26:30', trace: { thoughts: [{ content: '用户咨询保修期，需要查询具体产品信息', timestamp: '14:26:20' }], tool_calls: [] }},
-  { message_id: 'm13', scenario_id: 'HS-003', role: 'user', content: '我是昨天买的那个蓝牙耳机', timestamp: '14:27' },
-  { message_id: 'm14', scenario_id: 'HS-003', role: 'assistant', content: '蓝牙耳机的保修期一般是1年，具体您可以查看购买时的说明。', timestamp: '14:27:30' },
-  { message_id: 'm15', scenario_id: 'HS-003', role: 'user', content: '如果坏了怎么修？', timestamp: '14:28' },
-  { message_id: 'm16', scenario_id: 'HS-003', role: 'assistant', content: '如果出现问题，您可以联系售后客服进行处理。', timestamp: '14:28:30' },
-  { message_id: 'vr3', scenario_id: 'HS-003', role: 'system', type: 'verdict_request', content: '场景「售后咨询」的对话已达到可判定阶段。数字员工已完成：回复保修政策 → 确认产品类型 → 提供售后渠道', timestamp: '14:30', submitted: true, submittedVerdict: 'failed', submittedComment: '回复不够详细，未提供具体解决方案' },
-  { message_id: 'ob1', scenario_id: null, role: 'system', type: 'onboarding_request', content: '所有场景评估已完成，请做出上岗判定。', timestamp: '14:35', submitted: true, submittedOnboarding: 'force', submittedComment: '虽然售后咨询不合格，但主要场景通过，可以上岗观察' },
+];
+
+const HUMAN_SCENARIOS = [
+  { scenario_id: 'HS-001', scenario_name: '投诉处理', status: 'in_progress', verdict: null, verdict_comment: null, message_count: 6, started_at: '14:00', completed_at: null },
+  { scenario_id: 'HS-002', scenario_name: '功能建议', status: 'pending', verdict: null, verdict_comment: null, message_count: 4, started_at: null, completed_at: null },
+  { scenario_id: 'HS-003', scenario_name: '售后咨询', status: 'pending', verdict: null, verdict_comment: null, message_count: 5, started_at: null, completed_at: null },
 ];
 
 // ===== Human Evaluation Sub Components =====
@@ -986,12 +983,12 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
         <div className="human-msg-verdict-submitted">
           <div className="human-msg-verdict-head submitted">
             <span className="human-msg-verdict-icon submitted">✓</span>
-            <span className="human-msg-verdict-title submitted">场景评估判定（已完成）</span>
+            <span className="human-msg-verdict-title submitted">场景处理判定（已完成）</span>
           </div>
           <p className="human-msg-verdict-desc">{msg.content}</p>
           <div className={`human-msg-verdict-result ${msg.submittedVerdict}`}>
-            {msg.submittedVerdict === 'passed' ? '✓' : '×'}
-            <span>{msg.submittedVerdict === 'passed' ? '合格' : '不合格'}</span>
+            {msg.submittedVerdict === 'passed' ? '😊' : '😞'}
+            <span>{msg.submittedVerdict === 'passed' ? '满意' : '不满意'}</span>
             {msg.submittedComment && <span className="human-msg-verdict-comment">— {msg.submittedComment}</span>}
           </div>
         </div>
@@ -1001,9 +998,9 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
     return (
       <div className="human-msg-verdict-request">
         <div className="human-msg-verdict-head request">
-          <span className="human-msg-verdict-icon request">⚠</span>
-          <span className="human-msg-verdict-title request">场景评估判定</span>
-          <span className="human-msg-verdict-badge">必选</span>
+          <span className="human-msg-verdict-icon request">📋</span>
+          <span className="human-msg-verdict-title request">场景处理判定</span>
+          <span className="human-msg-verdict-badge">请选择</span>
         </div>
         <p className="human-msg-verdict-desc">{msg.content}</p>
         <HumanVerdictPanel messageId={msg.message_id} onSubmit={onVerdictSubmit} />
@@ -1023,9 +1020,9 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
             <span className="human-msg-onboarding-icon submitted">✓</span>
             <span className="human-msg-onboarding-title submitted">上岗判定（已完成）</span>
           </div>
-          <div className={`human-msg-onboarding-result ${msg.submittedOnboarding === 'onboard' || msg.submittedOnboarding === 'force' ? 'passed' : 'failed'}`}>
-            {msg.submittedOnboarding === 'onboard' || msg.submittedOnboarding === 'force' ? '✓' : '×'}
-            <span>{msg.submittedOnboarding === 'onboard' ? '上岗' : msg.submittedOnboarding === 'force' ? '强制上岗' : '不上岗'}</span>
+          <div className={`human-msg-onboarding-result ${msg.submittedOnboarding === 'onboard' ? 'passed' : 'failed'}`}>
+            {msg.submittedOnboarding === 'onboard' ? '✓' : '×'}
+            <span>{msg.submittedOnboarding === 'onboard' ? '可以上岗' : '不可以上岗'}</span>
             {msg.submittedComment && <span className="human-msg-onboarding-comment">— {msg.submittedComment}</span>}
           </div>
         </div>
@@ -1035,9 +1032,9 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
     return (
       <div className="human-msg-onboarding-request">
         <div className="human-msg-onboarding-head request">
-          <span className="human-msg-onboarding-icon request">👤</span>
+          <span className="human-msg-onboarding-icon request">🎯</span>
           <span className="human-msg-onboarding-title request">上岗判定</span>
-          <span className="human-msg-onboarding-badge">必选</span>
+          <span className="human-msg-onboarding-badge">请选择</span>
         </div>
 
         <div className="human-msg-onboarding-summary">
@@ -1045,18 +1042,18 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
           <div className="human-msg-onboarding-summary-grid">
             {scenarios.map(s => (
               <div key={s.scenario_id} className="human-msg-onboarding-summary-item">
-                {s.verdict === 'passed' ? '✓' : '×'}
+                {s.verdict === 'passed' ? '😊' : '😞'}
                 <span>{s.scenario_name}</span>
               </div>
             ))}
           </div>
           <div className="human-msg-onboarding-summary-foot">
-            <span>通过率: <strong className={allPassed ? 'green' : 'red'}>{passed}/{total}</strong></span>
-            <span className={allPassed ? 'green' : 'amber'}>{allPassed ? '✅ 全部合格' : '⚠️ 存在不合格场景'}</span>
+            <span>满意率: <strong className={allPassed ? 'green' : 'red'}>{passed}/{total}</strong></span>
+            <span className={allPassed ? 'green' : 'amber'}>{allPassed ? '✅ 全部满意' : '⚠️ 存在不满意场景'}</span>
           </div>
         </div>
 
-        <p className="human-msg-onboarding-desc">所有场景评估已完成。请根据评估结果，决定该数字员工是否上岗。</p>
+        <p className="human-msg-onboarding-desc">所有场景评估已完成（共 {total} 个场景）。请根据评估结果，决定该数字员工是否可以上岗。</p>
 
         <HumanOnboardingPanel messageId={msg.message_id} allPassed={allPassed} onSubmit={onOnboardingSubmit} />
       </div>
@@ -1066,6 +1063,10 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
   if (msg.role === 'user') {
     return (
       <div className="human-msg-user">
+        <div className="human-msg-user-meta">
+          <span className="human-msg-time">{msg.timestamp}</span>
+          <span className="human-msg-role">用户</span>
+        </div>
         <div className="human-msg-user-bubble">{msg.content}</div>
       </div>
     );
@@ -1081,13 +1082,31 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
 
   return (
     <div className="human-msg-assistant">
-      <div className="human-msg-assistant-bubble">
-        {msg.content}
-        {msg.trace && msg.trace.tool_calls && msg.trace.tool_calls.length > 0 && (
-          <div className="human-msg-assistant-tools">
-            <span>🔧 调用了 {msg.trace.tool_calls.length} 个工具</span>
-          </div>
-        )}
+      <div className="human-msg-assistant-avatar">
+        <span className="human-msg-avatar-icon">🤖</span>
+        <span className="human-msg-avatar-label">数字员工</span>
+      </div>
+      <div className="human-msg-assistant-content">
+        <div className="human-msg-assistant-meta">
+          <span className="human-msg-time">{msg.timestamp}</span>
+        </div>
+        <div className="human-msg-assistant-bubble">
+          {msg.content}
+          {msg.trace && msg.trace.tool_calls && msg.trace.tool_calls.length > 0 && (
+            <div className="human-msg-assistant-tools">
+              <span className="human-msg-tools-icon">⚡</span>
+              <span>调用了 {msg.trace.tool_calls.length} 个工具</span>
+              <div className="human-msg-tools-list">
+                {msg.trace.tool_calls.map(tc => (
+                  <span key={tc.timestamp} className="human-msg-tool-item">
+                    {tc.tool_name}
+                    {tc.success ? ' ✓' : ' ×'}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1101,12 +1120,12 @@ function HumanVerdictPanel({ messageId, onSubmit }) {
     <div className="human-verdict-panel">
       <div className="human-verdict-buttons">
         <button className={`human-verdict-btn ${verdict === 'passed' ? 'passed active' : ''}`} onClick={() => setVerdict('passed')}>
-          <span className="human-verdict-btn-icon">✓</span>
-          <span className="human-verdict-btn-label">合格</span>
+          <span className="human-verdict-btn-icon">😊</span>
+          <span className="human-verdict-btn-label">满意</span>
         </button>
         <button className={`human-verdict-btn ${verdict === 'failed' ? 'failed active' : ''}`} onClick={() => setVerdict('failed')}>
-          <span className="human-verdict-btn-icon">×</span>
-          <span className="human-verdict-btn-label">不合格</span>
+          <span className="human-verdict-btn-icon">😞</span>
+          <span className="human-verdict-btn-label">不满意</span>
         </button>
       </div>
       <div className="human-verdict-comment">
@@ -1130,37 +1149,24 @@ function HumanOnboardingPanel({ messageId, allPassed, onSubmit }) {
 
   return (
     <div className="human-onboarding-panel">
-      {allPassed ? (
-        <div className="human-onboarding-buttons">
-          <button className={`human-onboarding-btn ${decision === 'onboard' ? 'passed active' : ''}`} onClick={() => setDecision('onboard')}>
-            <span className="human-onboarding-btn-icon">✓</span>
-            <span className="human-onboarding-btn-label">上岗</span>
-            <span className="human-onboarding-btn-desc">数字员工符合上岗要求</span>
-          </button>
-          <button className={`human-onboarding-btn ${decision === 'reject' ? 'failed active' : ''}`} onClick={() => setDecision('reject')}>
-            <span className="human-onboarding-btn-icon">×</span>
-            <span className="human-onboarding-btn-label">不上岗</span>
-            <span className="human-onboarding-btn-desc">评估结果存疑，暂不上岗</span>
-          </button>
-        </div>
-      ) : (
-        <div className="human-onboarding-buttons-v">
-          <button className={`human-onboarding-btn-v ${decision === 'reject' ? 'failed active' : ''}`} onClick={() => setDecision('reject')}>
-            <span className="human-onboarding-btn-icon">×</span>
-            <span>不上岗 — 存在不合格场景，暂不上岗</span>
-          </button>
-          <button className={`human-onboarding-btn-v ${decision === 'force' ? 'amber active' : ''}`} onClick={() => setDecision('force')}>
-            <span className="human-onboarding-btn-icon amber">🛡</span>
-            <span>强制上岗 — 存在不合格场景，但仍要求上岗</span>
-          </button>
-        </div>
-      )}
+      <div className="human-onboarding-buttons">
+        <button className={`human-onboarding-btn ${decision === 'onboard' ? 'passed active' : ''}`} onClick={() => setDecision('onboard')}>
+          <span className="human-onboarding-btn-icon">✅</span>
+          <span className="human-onboarding-btn-label">可以上岗</span>
+          <span className="human-onboarding-btn-desc">数字员工整体表现满意，符合上岗要求</span>
+        </button>
+        <button className={`human-onboarding-btn ${decision === 'reject' ? 'failed active' : ''}`} onClick={() => setDecision('reject')}>
+          <span className="human-onboarding-btn-icon">❌</span>
+          <span className="human-onboarding-btn-label">不可以上岗</span>
+          <span className="human-onboarding-btn-desc">数字员工表现不满意，暂不具备上岗条件</span>
+        </button>
+      </div>
       <div className="human-onboarding-comment">
         <label>判定备注（可选）</label>
         <input value={comment} onChange={e => setComment(e.target.value)} placeholder="填写判定原因..." />
       </div>
       <button
-        className={`human-onboarding-submit ${decision ? (decision === 'onboard' || decision === 'force' ? 'passed' : 'failed') : 'disabled'}`}
+        className={`human-onboarding-submit ${decision ? (decision === 'onboard' ? 'passed' : 'failed') : 'disabled'}`}
         onClick={() => decision && onSubmit && onSubmit(decision, comment, messageId)}
         disabled={!decision}
       >
@@ -1241,7 +1247,7 @@ function HumanReportPanel({ currentScenario }) {
       {currentScenario?.verdict && (
         <div className={`human-report-verdict ${currentScenario.verdict}`}>
           {currentScenario.verdict === 'passed' ? '✓' : '×'}
-          <span>{currentScenario.verdict === 'passed' ? '合格' : '不合格'}</span>
+          <span>{currentScenario.verdict === 'passed' ? '满意' : '不满意'}</span>
           {currentScenario.verdict_comment && <p>{currentScenario.verdict_comment}</p>}
         </div>
       )}
@@ -1510,7 +1516,7 @@ function HumanEvalPage({ id, go, toast }) {
   const e = window.findEmployeeById(id) || window.DEPT_EMPLOYEES[1];
   const [scenarios, setScenarios] = _useStateE(HUMAN_SCENARIOS);
   const [messages, setMessages] = _useStateE(HUMAN_MESSAGES);
-  const [currentScenarioId, setCurrentScenarioId] = _useStateE('HS-002');
+  const [currentScenarioId, setCurrentScenarioId] = _useStateE('HS-001');
   const [chatInput, setChatInput] = _useStateE('');
   const [artifactTab, setArtifactTab] = _useStateE('conversation');
   const [rightCollapsed, setRightCollapsed] = _useStateE(false);
@@ -1522,6 +1528,13 @@ function HumanEvalPage({ id, go, toast }) {
   const showReportButton = allCompleted && (hasOnboardingRequest || onboardingSubmitted);
 
   const currentScenario = scenarios.find(s => s.scenario_id === currentScenarioId) || scenarios[0];
+
+  // 找出当前需要判定的消息
+  const pendingVerdictMessage = messages.find(m => m.type === 'verdict_request' && !m.submitted && m.scenario_id === currentScenarioId);
+  const pendingOnboardingMessage = messages.find(m => m.type === 'onboarding_request' && !m.submitted);
+
+  // 当前是否需要用户判定
+  const needsVerdict = pendingVerdictMessage || pendingOnboardingMessage;
 
   const TABS = [
     { key: 'conversation', label: '对话记录' },
@@ -1556,6 +1569,36 @@ function HumanEvalPage({ id, go, toast }) {
         <HumanScenarioProgressBar scenarios={scenarios} />
       </div>
 
+      {/* 流程状态指示器 */}
+      {needsVerdict && (
+        <div className="human-flow-indicator">
+          <div className="human-flow-steps">
+            <div className="human-flow-step done">
+              <span className="human-flow-step-icon">✓</span>
+              <span className="human-flow-step-label">场景对话</span>
+            </div>
+            <div className="human-flow-arrow">→</div>
+            <div className="human-flow-step active">
+              <span className="human-flow-step-icon pulse">⏳</span>
+              <span className="human-flow-step-label">{pendingOnboardingMessage ? '上岗判定' : '场景判定'}</span>
+            </div>
+            {pendingOnboardingMessage && (
+              <>
+                <div className="human-flow-arrow">→</div>
+                <div className="human-flow-step">
+                  <span className="human-flow-step-icon">🎯</span>
+                  <span className="human-flow-step-label">完成评估</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="human-flow-hint">
+            <span className="human-flow-hint-icon">💡</span>
+            <span>请根据对话内容，做出判定</span>
+          </div>
+        </div>
+      )}
+
       <div className="human-main">
         <div className="human-chat-panel">
           <div className="human-nav-wrap">
@@ -1566,34 +1609,13 @@ function HumanEvalPage({ id, go, toast }) {
             />
           </div>
           <div className="human-messages">
-            {messages.map(msg => (
+            {messages.filter(m => m.type !== 'verdict_request' && m.type !== 'onboarding_request').map(msg => (
               <HumanChatMessage
                 key={msg.message_id}
                 msg={msg}
                 scenarios={scenarios}
-                onVerdictSubmit={(verdict, comment, messageId) => {
-                  setMessages(prev => prev.map(m =>
-                    m.message_id === messageId
-                      ? { ...m, submitted: true, submittedVerdict: verdict, submittedComment: comment }
-                      : m
-                  ));
-                  setScenarios(prev => prev.map(s =>
-                    s.scenario_id === currentScenarioId
-                      ? { ...s, status: 'completed', verdict, verdict_comment: comment }
-                      : s
-                  ));
-                  toast(`场景判定已提交: ${verdict === 'passed' ? '合格' : '不合格'}`);
-                }}
-                onOnboardingSubmit={(decision, comment, messageId) => {
-                  setOnboardingSubmitted(true);
-                  setMessages(prev => prev.map(m =>
-                    m.message_id === messageId
-                      ? { ...m, submitted: true, submittedOnboarding: decision, submittedComment: comment }
-                      : m
-                  ));
-                  setShowReportModal(true);
-                  toast(`上岗判定已提交: ${decision === 'onboard' ? '上岗' : decision === 'force' ? '强制上岗' : '不上岗'}`);
-                }}
+                onVerdictSubmit={null}
+                onOnboardingSubmit={null}
               />
             ))}
           </div>
@@ -1620,6 +1642,261 @@ function HumanEvalPage({ id, go, toast }) {
             <button className="human-artifact-expand" onClick={() => setRightCollapsed(false)}>
               <window.Icon.arrow className="icn" style={{ transform: 'rotate(90deg)' }} />
             </button>
+          ) : (
+            <>
+              {/* 判定面板 - 当有待判定项时显示 */}
+              {needsVerdict && (
+                <div className={`human-verdict-panel-fixed ${pendingOnboardingMessage ? 'onboarding' : 'scenario'}`}>
+                  {pendingOnboardingMessage ? (
+                    // 上岗判定
+                    <div className="human-verdict-onboarding">
+                      <div className="human-verdict-panel-header">
+                        <div className="human-verdict-panel-icon pulse">🎯</div>
+                        <div className="human-verdict-panel-title">上岗判定</div>
+                        <span className="human-verdict-panel-badge">需要判定</span>
+                      </div>
+                      <div className="human-verdict-panel-summary">
+                        <div className="human-verdict-summary-row">
+                          <span>评估场景</span>
+                          <span className="human-verdict-summary-value">{scenarios.length} 个</span>
+                        </div>
+                        <div className="human-verdict-summary-row">
+                          <span>满意场景</span>
+                          <span className="human-verdict-summary-value green">{scenarios.filter(s => s.verdict === 'passed').length} 个</span>
+                        </div>
+                        <div className="human-verdict-summary-row">
+                          <span>不满意场景</span>
+                          <span className="human-verdict-summary-value red">{scenarios.filter(s => s.verdict === 'failed').length} 个</span>
+                        </div>
+                      </div>
+                      <div className="human-verdict-panel-question">
+                        <span className="human-verdict-question-icon">❓</span>
+                        <span>所有场景评估已完成，该数字员工是否可以上岗？</span>
+                      </div>
+                      <div className="human-verdict-panel-options">
+                        <button
+                          className="human-verdict-option-btn large passed"
+                          onClick={() => {
+                            setOnboardingSubmitted(true);
+                            setMessages(prev => prev.map(m =>
+                              m.message_id === pendingOnboardingMessage.message_id
+                                ? { ...m, submitted: true, submittedOnboarding: 'onboard', submittedComment: '' }
+                                : m
+                            ));
+                            setShowReportModal(true);
+                            toast(`上岗判定已提交: 可以上岗`);
+                          }}
+                        >
+                          <span className="human-verdict-option-icon">✅</span>
+                          <span className="human-verdict-option-label">可以上岗</span>
+                        </button>
+                        <button
+                          className="human-verdict-option-btn large failed"
+                          onClick={() => {
+                            setOnboardingSubmitted(true);
+                            setMessages(prev => prev.map(m =>
+                              m.message_id === pendingOnboardingMessage.message_id
+                                ? { ...m, submitted: true, submittedOnboarding: 'reject', submittedComment: '' }
+                                : m
+                            ));
+                            setShowReportModal(true);
+                            toast(`上岗判定已提交: 不可以上岗`);
+                          }}
+                        >
+                          <span className="human-verdict-option-icon">❌</span>
+                          <span className="human-verdict-option-label">不可以上岗</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : pendingVerdictMessage ? (
+                    // 场景判定
+                    <div className="human-verdict-scenario">
+                      <div className="human-verdict-panel-header">
+                        <div className="human-verdict-panel-icon pulse">📋</div>
+                        <div className="human-verdict-panel-title">场景判定</div>
+                        <span className="human-verdict-panel-badge">需要判定</span>
+                      </div>
+                      <div className="human-verdict-panel-scenario-name">
+                        <span className="human-verdict-scenario-label">当前场景:</span>
+                        <span className="human-verdict-scenario-value">{currentScenario?.scenario_name}</span>
+                      </div>
+                      <div className="human-verdict-panel-question">
+                        <span className="human-verdict-question-icon">❓</span>
+                        <span>该场景的处理是否满意？</span>
+                      </div>
+                      <div className="human-verdict-panel-options">
+                        <button
+                          className="human-verdict-option-btn large passed"
+                          onClick={() => {
+                            // 提交当前场景判定
+                            setMessages(prev => prev.map(m =>
+                              m.message_id === pendingVerdictMessage.message_id
+                                ? { ...m, submitted: true, submittedVerdict: 'passed', submittedComment: '' }
+                                : m
+                            ));
+                            setScenarios(prev => prev.map(s =>
+                              s.scenario_id === currentScenarioId
+                                ? { ...s, status: 'completed', verdict: 'passed', verdict_comment: '', completed_at: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }
+                                : s
+                            ));
+                            toast(`场景判定已提交: 满意`);
+
+                            // 推进到下一个场景
+                            const nextScenarioIndex = scenarios.findIndex(s => s.scenario_id === currentScenarioId) + 1;
+                            if (nextScenarioIndex < scenarios.length) {
+                              const nextScenario = scenarios[nextScenarioIndex];
+                              setCurrentScenarioId(nextScenario.scenario_id);
+                              setScenarios(prev => prev.map(s =>
+                                s.scenario_id === nextScenario.scenario_id
+                                  ? { ...s, status: 'in_progress', started_at: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }
+                                  : s
+                              ));
+                              setTimeout(() => {
+                                const newDivider = {
+                                  message_id: `div${Date.now()}`,
+                                  scenario_id: null,
+                                  role: 'system',
+                                  type: 'scenario_divider',
+                                  content: `进入场景${nextScenarioIndex + 1}：${nextScenario.scenario_name}`,
+                                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                                };
+                                const newVerdict = {
+                                  message_id: `vr${Date.now()}`,
+                                  scenario_id: nextScenario.scenario_id,
+                                  role: 'system',
+                                  type: 'verdict_request',
+                                  content: `场景「${nextScenario.scenario_name}」已完成对话处理。请判断该场景的处理是否满意。`,
+                                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                                  submitted: false,
+                                };
+                                setMessages(prev => [...prev, newDivider, newVerdict]);
+                              }, 300);
+                            } else {
+                              setTimeout(() => {
+                                const onboardingMsg = {
+                                  message_id: `ob${Date.now()}`,
+                                  scenario_id: null,
+                                  role: 'system',
+                                  type: 'onboarding_request',
+                                  content: '所有场景评估已完成，请判断该数字员工是否可以上岗。',
+                                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                                  submitted: false,
+                                };
+                                setMessages(prev => [...prev, onboardingMsg]);
+                              }, 300);
+                            }
+                          }}
+                        >
+                          <span className="human-verdict-option-icon">😊</span>
+                          <span className="human-verdict-option-label">满意</span>
+                        </button>
+                        <button
+                          className="human-verdict-option-btn large failed"
+                          onClick={() => {
+                            setMessages(prev => prev.map(m =>
+                              m.message_id === pendingVerdictMessage.message_id
+                                ? { ...m, submitted: true, submittedVerdict: 'failed', submittedComment: '' }
+                                : m
+                            ));
+                            setScenarios(prev => prev.map(s =>
+                              s.scenario_id === currentScenarioId
+                                ? { ...s, status: 'completed', verdict: 'failed', verdict_comment: '', completed_at: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }
+                                : s
+                            ));
+                            toast(`场景判定已提交: 不满意`);
+
+                            const nextScenarioIndex = scenarios.findIndex(s => s.scenario_id === currentScenarioId) + 1;
+                            if (nextScenarioIndex < scenarios.length) {
+                              const nextScenario = scenarios[nextScenarioIndex];
+                              setCurrentScenarioId(nextScenario.scenario_id);
+                              setScenarios(prev => prev.map(s =>
+                                s.scenario_id === nextScenario.scenario_id
+                                  ? { ...s, status: 'in_progress', started_at: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }
+                                  : s
+                              ));
+                              setTimeout(() => {
+                                const newDivider = {
+                                  message_id: `div${Date.now()}`,
+                                  scenario_id: null,
+                                  role: 'system',
+                                  type: 'scenario_divider',
+                                  content: `进入场景${nextScenarioIndex + 1}：${nextScenario.scenario_name}`,
+                                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                                };
+                                const newVerdict = {
+                                  message_id: `vr${Date.now()}`,
+                                  scenario_id: nextScenario.scenario_id,
+                                  role: 'system',
+                                  type: 'verdict_request',
+                                  content: `场景「${nextScenario.scenario_name}」已完成对话处理。请判断该场景的处理是否满意。`,
+                                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                                  submitted: false,
+                                };
+                                setMessages(prev => [...prev, newDivider, newVerdict]);
+                              }, 300);
+                            } else {
+                              setTimeout(() => {
+                                const onboardingMsg = {
+                                  message_id: `ob${Date.now()}`,
+                                  scenario_id: null,
+                                  role: 'system',
+                                  type: 'onboarding_request',
+                                  content: '所有场景评估已完成，请判断该数字员工是否可以上岗。',
+                                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                                  submitted: false,
+                                };
+                                setMessages(prev => [...prev, onboardingMsg]);
+                              }, 300);
+                            }
+                          }}
+                        >
+                          <span className="human-verdict-option-icon">😞</span>
+                          <span className="human-verdict-option-label">不满意</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="human-verdict-divider" />
+                </div>
+              )}
+
+              <div className="human-artifact-head">
+                <div className="human-artifact-scenario">
+                  <label>场景:</label>
+                  <select value={currentScenarioId} onChange={e => setCurrentScenarioId(e.target.value)}>
+                    {scenarios.map(s => (
+                      <option key={s.scenario_id} value={s.scenario_id}>
+                        {s.scenario_name} ({s.status === 'completed' ? (s.verdict === 'passed' ? '满意' : '不满意') : '⏳'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button className="human-artifact-collapse" onClick={() => setRightCollapsed(true)}>
+                  <window.Icon.arrow className="icn" style={{ transform: 'rotate(-90deg)' }} />
+                </button>
+              </div>
+
+              <div className="human-artifact-tabs">
+                {TABS.map(tab => (
+                  <button
+                    key={tab.key}
+                    className={`human-artifact-tab ${artifactTab === tab.key ? 'active' : ''}`}
+                    onClick={() => setArtifactTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="human-artifact-content">
+                {artifactTab === 'conversation' && <HumanConversationPanel messages={messages} currentScenarioId={currentScenarioId} />}
+                {artifactTab === 'trace' && <HumanTracePanel messages={messages} currentScenarioId={currentScenarioId} />}
+                {artifactTab === 'report' && <HumanReportPanel currentScenario={currentScenario} />}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
           ) : (
             <>
               <div className="human-artifact-head">
