@@ -10,7 +10,8 @@
       "Bash(git -C \"d:/zhiyong/公司项目/ncrew/雇佣端原型设计\" status)",
       "Bash(git -C \"d:/zhiyong/公司项目/ncrew/雇佣端原型设计\" diff --stat)",
       "Bash(git -C \"d:/zhiyong/公司项目/ncrew/雇佣端原型设计\" status --short)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(ipconfig)"
     ]
   }
 }
