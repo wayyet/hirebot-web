@@ -1078,7 +1078,10 @@ function TemplatesPage({ go }) {
             <div className="emp-head">
               <window.Avatar initial={item.initial} tint={item.tint} size="md" />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h4 className="emp-name">{item.name}</h4>
+                <div className="row between">
+                  <h4 className="emp-name">{item.name}</h4>
+                  <span className={`pill ${item.source === "全局通用" ? "blue" : "purple"}`}>{item.source}</span>
+                </div>
                 <div className="emp-meta">适用：{item.sectors.join(" / ")}</div>
               </div>
             </div>
@@ -1086,13 +1089,14 @@ function TemplatesPage({ go }) {
             <p className="emp-desc">{item.summary}</p>
 
             <div className="emp-tags">
-              {item.tags.map((tag) => {
-                const c = { "AI增强": "green", "信息处理": "blue", "工具": "orange", "HR": "purple", "开发工具": "orange" }[tag] || "blue";
-                return <span key={`${item.id}-${tag}`} className={`pill ${c}`}>{tag}</span>;
-              })}
+              {item.tags.map((tag, idx) => <span key={`${item.id}-${tag}`} className={`pill ${idx % 2 ? "orange" : "blue"}`}>{tag}</span>)}
             </div>
 
             <div className="emp-foot">
+              <div className="emp-stats">
+                <span><window.Icon.users className="icn" /> {item.used} 部门已用</span>
+                <span><window.Icon.download className="icn" /> {item.cloned} 复制</span>
+              </div>
               <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`template/${item.id}`); }}>查看详情 →</button>
             </div>
           </div>
@@ -1140,7 +1144,13 @@ function DeptPage({ role, go }) {
     <div className="page">
       <div className="page-header hero-header">
         <div>
+          <span className="eyebrow">{isManager ? "团队资产总览" : "部门可复制员工"}</span>
           <h1 className="page-title">部门数字员工 · <em>研发部</em></h1>
+          <p className="page-sub">
+            {isManager
+              ? "部门长视角下统一管理已雇佣、待实习、已上岗三个阶段；所有卡片先进入详情，再由详情页分发下一步动作。"
+              : "普通成员只看到已上岗结果集。进入详情后可以一键创建自己的分身。"}
+          </p>
         </div>
         {isManager && (
           <button className="btn btn-primary" onClick={() => go("templates")}>
@@ -1199,6 +1209,11 @@ function DeptPage({ role, go }) {
               cardHint={isManager && employee.status === "live" ? `已上岗员工支持"快捷复制"，但卡片主动作仍然统一进入详情页。` : (!isManager ? "卡片进入详情页后可创建你的个人分身。" : "")}
               footerActions={(
                 <div className="action-row">
+                  {isManager && employee.status === "live" && (
+                    <button className="btn btn-ghost btn-sm" onClick={evt => { evt.stopPropagation(); go(`quick-clone/${employee.id}`); }}>
+                      快捷复制
+                    </button>
+                  )}
                   {employee.status === "interning_ai" && (
                     <button className="btn btn-primary btn-sm" onClick={evt => { evt.stopPropagation(); go(`eval-ai/${employee.id}`); }}>
                       进入 AI 评估
@@ -1222,1905 +1237,159 @@ function DeptPage({ role, go }) {
   );
 }
 
+function MyPage({ role, go }) {
+  const viewer = window.getViewer(role);
+  const [filter, setFilter] = _useState1("all");
+  const [jumpEmployee, setJumpEmployee] = _useState1(null);
+  const employees = window.getMyEmployeesForRole(role);
 
-/* ============================================================
-   我的数字员工 v3 — 直接嫁接自 我的数字员工交互样式
-   ============================================================ */
+  const list = employees.filter(item => {
+    if (filter === "all") return true;
+    if (filter === "live") return item.status === "live";
+    if (filter === "evaluating") return item.status === "interning_ai" || item.status === "interning_human";
+    if (filter === "branch") return item.type === "private_branch";
+    if (filter === "failed") return item.status === "failed";
+    return true;
+  });
 
-// ---- data (from data.js) ----
-window.__DATA__ = (function () {
-  const employees = [
-    { id: "zhaopin-li", name: "招聘小慧 · 李工", initial: "李", avatarTone: "indigo", role: "部门分身", tag: "HR", status: "live", kind: "分身", desc: "我的招聘助手，记得我经常招后端 / 算法两类岗位。", lastUpdate: "今天 14:08", lastActive: "12 分钟前", copies: 0, tasks: 42, im: { feishu: "connected", dingtalk: "connected", wecom: "unset" } },
-    { id: "shichang-xiaotu", name: "市场小图 · 我的版", initial: "市", avatarTone: "green", role: "部门分身", tag: "运营", status: "humanEval", kind: "分身", desc: "整理周度市场动态，目前正在由我亲自评审输出风格。", lastUpdate: "今天 09:15", copies: 0, tasks: 6, im: { feishu: "unset", dingtalk: "unset", wecom: "unset" } },
-    { id: "zhaopin-offer", name: "招聘小慧 · 我的 Offer 版", initial: "Of", avatarTone: "violet", role: "私人定制", tag: "HR", status: "evaluating", kind: "私人定制", desc: "在部门分身基础上，定制了 offer 谈判话术与薪资测算逻辑。", lastUpdate: "今天 10:30", progress: 71, copies: 0, tasks: 8, im: { feishu: "unset", dingtalk: "unset", wecom: "unset" } },
-    { id: "xingye-xiaoyan", name: "行业小研 · 李工", initial: "研", avatarTone: "green", role: "部门分身", tag: "情报", status: "live", kind: "分身", desc: "每周一早上把 AI Infra 赛道周报推送给我，站内对话也会保留追问历史。", lastUpdate: "昨天", lastActive: "今天 08:00", copies: 0, tasks: 19, im: { feishu: "unset", dingtalk: "unset", wecom: "connected" } },
-    { id: "zhaopin-xiaozhao", name: "招聘小慧 · 校招专版", initial: "校", avatarTone: "violet", role: "私人定制", tag: "HR", status: "live", kind: "私人定制", desc: "为校招场景定制的招聘助手，掌握实习生评估、校园招招聘营延。", lastUpdate: "今天 11:42", lastActive: "30 分钟前", copies: 0, tasks: 14, im: { feishu: "connected", dingtalk: "unset", wecom: "unset" } },
-    { id: "wenan-xiaoshu", name: "文案小书 · 李工", initial: "书", avatarTone: "amber", role: "部门分身", tag: "写作", status: "pending", kind: "分身", desc: "帮我把会议纪要整理成对外发布的文稿，需要审核三条更新。", lastUpdate: "3 天前", lastActive: "3 天前", copies: 0, tasks: 5, im: { feishu: "connected", dingtalk: "unset", wecom: "unset" } },
-  ];
-  const conversations = {
-    "zhaopin-li": [
-      { role: "system", text: "本会话仅限「招聘小慧 · 李工」。历史会自动保留，不支持新建窗口。", time: "今天 09:12" },
-      { role: "agent",  text: "早，李工。昨天后端 P6 的 3 份简历我已经按你过去的口味排过序了，第一份候选人在 2018-2022 有完整的搜索召回背景。要现在过一下吗？", time: "今天 09:13" },
-      { role: "user",   text: "先把第一位的项目经历摘出来给我，重点看搜推。", time: "今天 09:14" },
-      { role: "agent",  text: "好的。三段相关经历：\n1) 2019 @ 美图 · 搜索召回，从 ES 迁到向量召回，CTR +6.2%\n2) 2020 @ 某独角兽 · 推荐重排，引入 listwise loss\n3) 2022 @ 现公司 · 多路融合 + 端上重排\n要我拉出他每段的产出指标吗？", time: "今天 09:15" },
-      { role: "user",   text: "放。另外帮我约下午 4 点的一面。", time: "今天 14:05" },
-      { role: "agent",  text: "已发出邀约（飞书 + 钉钉同步），候选人 14:08 已确认。要我在面试前 15 分钟提醒你吗？", time: "今天 14:08" },
-    ],
-    "zhaopin-offer": [
-      { role: "system", text: "本会话仅限「招聘小慧 · 我的 Offer 版」。当前 AI 评估进度 71%，部分能力尚未解锁。", time: "今天 10:30" },
-      { role: "agent",  text: "李工，你上传的薪资带宽 2026Q2 已经载入。要不要我先跑一遍上周那位 P6 候选人的 offer 测算？", time: "今天 10:31" },
-      { role: "user",   text: "跑一下，按竞品 +8% 的口径。", time: "今天 10:32" },
-      { role: "agent",  text: "测算完成：\n· 现金部分：建议 base 56k × 16，浮动 ±2k\n· 期权：4 年归属，建议给到 1.8x 中位\n· 签字费：8w，分两年返还\n谈判优先级：base > 期权 > 签字费。要导出一份谈判脚本吗？", time: "今天 10:33" },
-      { role: "user",   text: "先不要，等 AI 评估完整跑完再说。", time: "今天 10:34" },
-    ],
-    "zhaopin-xiaozhao": [
-      { role: "system", text: "本会话仅限「招聘小慧 · 校招专版」。该员工是你为校招场景定制的版本。", time: "今天 11:00" },
-      { role: "agent",  text: "李工，终面三期名单整理完了。名单上 28 位同学，按调带意愿度 + 笔试成绩已预排。Top 5 要我现在带过一下吗？", time: "今天 11:30" },
-      { role: "user",   text: "先看 1、3 位，主要关注 ACM 背景。", time: "今天 11:35" },
-      { role: "agent",  text: "好的：\n· 同学 1：ACM-ICPC 亚区赛金奖，本科期间 2 篇 SIGKDD\n· 同学 3：ACM区域赛银奖，毕设是分布式训练框架\n要不要我把他们两位推进「分布式系统」面试名单？", time: "今天 11:38" },
-      { role: "user",   text: "推进去，顺便给他们一些实习生专属题。", time: "今天 11:40" },
-      { role: "agent",  text: "已加入「实习生专属题」题库（3 道代码题 + 1 道场景题）。面试官邮件 12:00 发出。", time: "今天 11:42" },
-    ],
-    "xingye-xiaoyan": [
-      { role: "system", text: "本会话仅限「行业小研 · 李工」。每周一 08:00 自动推送周报。", time: "周一 08:00" },
-      { role: "agent",  text: "本周 AI Infra 赛道关键变化（3 条）：\n1) 国内推理框架开源生态多 2 家入场\n2) H20 替代方案的 PoC 在金融行业落地\n3) 端上小模型 4B 以下的产品化加速\n要看哪条的细节？", time: "周一 08:00" },
-      { role: "user",   text: "第 2 条。重点看银行场景。", time: "周一 09:20" },
-      { role: "agent",  text: "已展开。某股份制银行 2025Q4 启动的 PoC，结论：在风控离线推理上替代率 ~70%，时延可接受；在线交易场景仍依赖原方案。我把原始文档链接放在右上「资料」里了。", time: "周一 09:22" },
-      { role: "user",   text: "好。帮我留意一下这家银行后续的公开招标。", time: "今天 08:00" },
-      { role: "agent",  text: "已加入监控清单，下次出现公开招标 / 中标公告会第一时间发到这里。", time: "今天 08:00" },
-    ],
-    "wenan-xiaoshu": [
-      { role: "system", text: "本会话仅限「文案小书 · 李工」。当前有 3 条更新待你审核。", time: "3 天前" },
-      { role: "agent",  text: "上周三的产品评审纪要我整理成了三版文案：① 全员同步版；② 对外公关版；③ 客户邮件版。请按需审核。", time: "3 天前" },
-      { role: "user",   text: "先看对外公关版，控制在 400 字以内。", time: "3 天前" },
-      { role: "agent",  text: "已压缩到 386 字，重点保留了「自研推理栈、节省 32% 算力、Q3 全量」。要直接进入审核流程吗？", time: "3 天前" },
-    ],
+  const totals = {
+    all: employees.length,
+    live: employees.filter(item => item.status === "live").length,
+    evaluating: employees.filter(item => item.status === "interning_ai" || item.status === "interning_human").length,
+    branch: employees.filter(item => item.type === "private_branch").length,
+    failed: employees.filter(item => item.status === "failed").length
   };
-  return { employees, conversations };
-})();
 
-window.__FILE_TONE__ = {
-  pdf:  { tone: "pink",    label: "PDF" },
-  doc:  { tone: "blue",   label: "DOC" },
-  docx: { tone: "blue",   label: "DOC" },
-  xls:  { tone: "green",  label: "XLS" },
-  xlsx: { tone: "green",  label: "XLS" },
-  ppt:  { tone: "amber",  label: "PPT" },
-  pptx: { tone: "amber",  label: "PPT" },
-  md:   { tone: "purple", label: "MD"  },
-  png:  { tone: "neutral", label: "IMG" },
-  jpg:  { tone: "neutral", label: "IMG" },
-  jpeg: { tone: "neutral", label: "IMG" },
-  file: { tone: "neutral", label: "FILE" },
-};
-window.__formatSize__ = function(b) {
-  return b < 1024 ? b + " B" : b < 1048576 ? (b/1024).toFixed(1) + " KB" : (b/1048576).toFixed(1) + " MB";
-};
-window.__inferKind__ = function(n) {
-  var ext = n.split(".").pop().toLowerCase();
-  return ext in window.__FILE_TONE__ ? ext : "file";
-};
+  function renderFooter(employee) {
+    const connected = window.getConnectedChannels(employee.id).length > 0;
 
-
-
-// ---- from imConfig.jsx ----
-/* global React */
-/* IM platform configuration page for a digital employee. */
-const { useState: useIMState } = React;
-
-const IM_PLATFORMS = [
-  {
-    key: "feishu",
-    name: "飞书",
-    mark: "飞",
-    tone: "indigo",
-    method: "WebSocket 长连接",
-    fields: [
-      { key: "appId",     label: "App ID",     hint: "请输入飞书 App ID" },
-      { key: "appSecret", label: "App Secret", hint: "请输入飞书 App Secret" },
-    ],
-    tip: "推荐使用 WebSocket 长连接，免外网回调可用。",
-  },
-  {
-    key: "dingtalk",
-    name: "钉钉",
-    mark: "钉",
-    tone: "amber",
-    method: "URL 回调",
-    fields: [
-      { key: "agentId", label: "AgentId", hint: "请输入钉钉 AgentId" },
-      { key: "secret",  label: "AppSecret", hint: "请输入钉钉 AppSecret" },
-    ],
-    tip: "URL 回调需在钉钉开放平台设置事件订阅地址。",
-  },
-  {
-    key: "wecom",
-    name: "企微",
-    mark: "企",
-    tone: "green",
-    method: "WebSocket 长连接",
-    fields: [
-      { key: "appId",     label: "App ID",     hint: "请输入企微 AgentID" },
-      { key: "appSecret", label: "App Secret", hint: "请输入企微应用 Secret" },
-    ],
-    tip: "直接输入 AgentID 与 Secret 即可建立企微长连接。",
-  },
-];
-
-const MODE_OPTIONS = [
-  { key: "ws",  label: "WebSocket 长连接（推荐）" },
-  { key: "url", label: "使用 URL 回调" },
-];
-
-function IMConfigIcon({ name }) {
-  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
-  switch (name) {
-    case "back":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M15 18l-6-6 6-6"/></svg>;
-    case "arrow-right":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M5 12h14M13 5l7 7-7 7"/></svg>;
-    default:
-      return null;
-  }
-}
-
-function MyImCfgPage({ emp, onBack }) {
-  const [activeKey, setActiveKey] = useIMState(
-    // start at first unconnected, fallback to first
-    (IM_PLATFORMS.find((p) => emp.im[p.key] !== "connected") || IM_PLATFORMS[0]).key
-  );
-  const [mode, setMode] = useIMState("ws");
-  const [form, setForm] = useIMState({});
-
-  const active = IM_PLATFORMS.find((p) => p.key === activeKey);
-  const connectedCount = IM_PLATFORMS.filter((p) => emp.im[p.key] === "connected").length;
-  const isConnected = emp.im[active.key] === "connected";
-
-  const setField = (k, v) => setForm((f) => ({ ...f, [activeKey]: { ...(f[activeKey] || {}), [k]: v } }));
-  const values = form[activeKey] || {};
-
-  return (
-    <div className="im-config-page">
-      <button className="detail-back" onClick={onBack}>
-        <IMConfigIcon name="back"/>
-        <span>返回详情</span>
-      </button>
-
-      <header className="im-cfg-head">
-        <span className="eyebrow">多平台 IM 接入</span>
-        <h1 className="im-cfg-title">
-          IM 配置 <span className="im-cfg-title-accent">· {emp.name}</span>
-        </h1>
-        <p className="im-cfg-sub">
-          每个平台独立配置，支持 WebSocket 长连接和 URL 回调两种方式。上岗后 IM 接入是可选步骤，不阻塞站内对话使用。
-        </p>
-      </header>
-
-      <div className="im-cfg-body">
-        {/* ============ left ============ */}
-        <div className="im-cfg-left">
-          <section className="detail-card">
-            <div className="detail-card-head"><h3>平台选择</h3></div>
-            <div className="im-pick-list">
-              {IM_PLATFORMS.map((p) => {
-                const on = emp.im[p.key] === "connected";
-                const isActive = p.key === activeKey;
-                return (
-                  <button
-                    key={p.key}
-                    type="button"
-                    className={"im-pick " + (isActive ? "active " : "") + (on ? "connected" : "")}
-                    onClick={() => setActiveKey(p.key)}
-                  >
-                    <span className={"avatar-chip av-" + p.tone} style={{width: 30, height: 30, fontSize: 12}}>{p.mark}</span>
-                    <span className="im-pick-name">{p.name}</span>
-                    <span className={"li-badge " + (on ? "live" : "pending")}>
-                      {on ? "已连接" : "未配置"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="detail-card">
-            <div className="detail-card-head"><h3>当前状态</h3></div>
-            <div className="im-status-box">
-              <div className="im-status-head">
-                <div className="im-status-name">{active.name}</div>
-                <span className={"li-badge " + (isConnected ? "live" : "pending")}>
-                  {isConnected ? "已连接" : "未配置"}
-                </span>
-              </div>
-              <div className="im-status-desc">
-                选择连接方式并输入对应凭据，以将此数字员工绑定到{active.name} AIBot。
-              </div>
-              <dl className="im-status-table">
-                <div><dt>绑定对象</dt><dd>{emp.name}</dd></div>
-                <div><dt>连接方式</dt><dd>{isConnected ? active.method : "尚未选择"}</dd></div>
-                <div><dt>最近连接</dt><dd>{isConnected ? "今天 14:08" : "—"}</dd></div>
-                <div><dt>已连接平台</dt><dd>{connectedCount} 个</dd></div>
-              </dl>
-            </div>
-          </section>
-
-          <div className="im-cfg-footnote">
-            已连接平台之间互不影响。重新注册只会更新当前平台，不会覆盖其他平台的凭据。
-          </div>
-        </div>
-
-        {/* ============ right ============ */}
-        <div className="im-cfg-right">
-          <section className="detail-card">
-            <div className="detail-card-head"><h3>接入模式</h3></div>
-            <div className="im-mode-row">
-              {MODE_OPTIONS.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  className={"im-mode " + (mode === m.key ? "on" : "")}
-                  onClick={() => setMode(m.key)}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="im-mode-tip">{active.tip}</div>
-
-            <div className="im-cred-section">
-              <div className="im-cred-title">凭证表单</div>
-              <div className="im-cred-grid">
-                {active.fields.map((f) => (
-                  <div className="im-field" key={f.key}>
-                    <label>{f.label} · 必填</label>
-                    <input
-                      type="text"
-                      placeholder={f.hint}
-                      value={values[f.key] || ""}
-                      onChange={(e) => setField(f.key, e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="im-cfg-actions">
-              <button className="action-ghost" onClick={onBack}>取消</button>
-              <button className="action-primary">
-                <span>注册并连接</span>
-                <IMConfigIcon name="arrow-right"/>
-              </button>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-
-// ---- from goImModal.jsx ----
-/* global React */
-/* "去 IM" demo modal — picks which connected platform to launch. */
-const { useEffect: useGoIMEffect } = React;
-
-const GO_IM_PLATFORMS = [
-  { key: "feishu",   name: "飞书", mark: "飞", tone: "indigo", scheme: "feishu://"   },
-  { key: "dingtalk", name: "钉钉", mark: "钉", tone: "amber",  scheme: "dingtalk://" },
-  { key: "wecom",    name: "企微", mark: "企", tone: "green",  scheme: "wxwork://"   },
-];
-
-// Try to launch the platform's native client.
-// Falls back gracefully if the URL scheme isn't registered.
-window.__launchIM__ = function launchIM(platformKey) {
-  const p = GO_IM_PLATFORMS.find((x) => x.key === platformKey);
-  if (!p) return;
-  // Iframe trick avoids navigating the page away if the scheme isn't registered.
-  const f = document.createElement("iframe");
-  f.style.display = "none";
-  f.src = p.scheme;
-  document.body.appendChild(f);
-  // Cleanup after a moment.
-  setTimeout(() => { try { document.body.removeChild(f); } catch (_) {} }, 1200);
-  // Also try direct location for browsers that ignore iframe deep-links
-  try { window.location.href = p.scheme; } catch (_) {}
-};
-
-function GoIMModal({ open, emp, onClose }) {
-  useGoIMEffect(() => {
-    if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape") onClose && onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open || !emp) return null;
-  const connected = GO_IM_PLATFORMS.filter((p) => emp.im[p.key] === "connected");
-
-  return (
-    <div className="go-im-overlay"
-         onMouseDown={(e) => { if (e.target === e.currentTarget) onClose && onClose(); }}>
-      <div className="go-im-modal" role="dialog" aria-modal="true">
-        <header className="go-im-head">
-          <div className="go-im-titles">
-            <div className="go-im-title">去 IM · {emp.name}</div>
-            <div className="go-im-sub">演示模式下会模拟拉起对应平台私聊。</div>
-          </div>
-          <button className="go-im-close" onClick={onClose} aria-label="关闭">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-                 strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 6l12 12M18 6L6 18"/>
-            </svg>
-          </button>
-        </header>
-
-        <div className="go-im-body">
-          {connected.length > 0 ? (
-            <div className="go-im-options">
-              {connected.map((p) => (
-                <button
-                  key={p.key}
-                  className="go-im-option"
-                  onClick={() => {
-                    window.__launchIM__ && window.__launchIM__(p.key);
-                    onClose && onClose();
-                  }}
-                >
-                  <span className={"avatar-chip av-" + p.tone}
-                        style={{ width: 26, height: 26, fontSize: 12, borderRadius: 8 }}>
-                    {p.mark}
-                  </span>
-                  <span className="go-im-option-name">{p.name}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="go-im-empty">
-              尚未有效连接 IM，请先连接。
-            </div>
-          )}
-        </div>
-
-        <footer className="go-im-foot">
-          <button className="action-ghost" onClick={onClose}>关闭</button>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-
-
-// ---- from imConfigModal.jsx ----
-/* global React */
-/* Modal: configure a single IM platform for a digital employee. */
-const { useState: useModalState, useEffect: useModalEffect, useRef: useModalRef } = React;
-
-const MODAL_PLATFORMS = {
-  feishu:   { name: "飞书", mark: "飞", tone: "indigo" },
-  dingtalk: { name: "钉钉", mark: "钉", tone: "amber" },
-  wecom:    { name: "企微", mark: "企", tone: "green" },
-};
-
-const MODE_FORMS = {
-  ws: {
-    title: "WebSocket 长连接（推荐）",
-    tip:   "直接输入应用凭据即可建立长连接，免外网回调地址。",
-    fields: (platform) => {
-      const labels = {
-        feishu:   ["App ID", "App Secret"],
-        dingtalk: ["AgentID", "AppSecret"],
-        wecom:    ["AgentID", "Secret"],
-      }[platform] || ["App ID", "App Secret"];
-      return [
-        { key: "id",     label: labels[0], hint: `请输入${MODAL_PLATFORMS[platform].name} ${labels[0]}` },
-        { key: "secret", label: labels[1], hint: `请输入${MODAL_PLATFORMS[platform].name} ${labels[1]}` },
-      ];
-    },
-  },
-  url: {
-    title: "使用 URL 回调",
-    tip:   "需要在开放平台配置回调地址、Token 与 EncodingAESKey。",
-    fields: () => [
-      { key: "url",   label: "回调地址",        hint: "https://example.com/im/callback" },
-      { key: "token", label: "Token",          hint: "请输入开放平台 Token" },
-      { key: "aes",   label: "EncodingAESKey", hint: "请输入 43 位 AESKey" },
-    ],
-  },
-};
-
-function ModalIcon({ name }) {
-  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
-  switch (name) {
-    case "x":     return <svg viewBox="0 0 24 24" {...stroke}><path d="M6 6l12 12M18 6L6 18"/></svg>;
-    case "check": return <svg viewBox="0 0 24 24" {...stroke}><path d="M5 13l4 4 10-10"/></svg>;
-    case "warn":  return <svg viewBox="0 0 24 24" {...stroke}><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>;
-    case "loader":
+    if (employee.status === "live") {
       return (
-        <svg viewBox="0 0 24 24" className="modal-spin" fill="none" stroke="currentColor"
-             strokeWidth="2.2" strokeLinecap="round">
-          <path d="M12 3a9 9 0 1 1-6.4 2.6" opacity="0.85"/>
-        </svg>
+        <div className="action-row">
+          <button className="btn btn-primary btn-sm" onClick={evt => { evt.stopPropagation(); go(`chat/${employee.id}`); }}>
+            开始对话
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={evt => { evt.stopPropagation(); connected ? setJumpEmployee(employee) : go(`im/${employee.id}`); }}>
+            {connected ? "去 IM" : "配置 IM"}
+          </button>
+          <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>详情</button>
+        </div>
       );
-    default: return null;
-  }
-}
-
-function IMConfigModal({ open, emp, platform, onClose, onConnected }) {
-  const [mode, setMode] = useModalState("ws");
-  const [values, setValues] = useModalState({});
-  const [phase, setPhase] = useModalState("idle"); // idle | connecting | success | error
-  const [errorMsg, setErrorMsg] = useModalState("");
-  const overlayRef = useModalRef(null);
-
-  // Reset state every time the modal opens or platform changes
-  useModalEffect(() => {
-    if (open) {
-      setMode("ws");
-      setValues({});
-      setPhase("idle");
-      setErrorMsg("");
     }
-  }, [open, platform]);
 
-  // ESC to close
-  useModalEffect(() => {
-    if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape" && phase !== "connecting") onClose && onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, phase, onClose]);
-
-  if (!open || !platform) return null;
-  const p = MODAL_PLATFORMS[platform];
-  const form = MODE_FORMS[mode];
-  const fields = form.fields(platform);
-
-  const allFilled = fields.every((f) => (values[f.key] || "").trim().length > 0);
-
-  const submit = () => {
-    if (!allFilled || phase === "connecting") return;
-    setPhase("connecting");
-    setErrorMsg("");
-    // Simulated connection — deterministic: contains "fail" => fail, else succeed after 1.6s
-    const willFail = Object.values(values).some((v) => /fail|err/i.test(String(v)));
-    setTimeout(() => {
-      if (willFail) {
-        setPhase("error");
-        setErrorMsg("凭据校验失败：请检查 ID/Secret 后重试");
-      } else {
-        setPhase("success");
-        onConnected && onConnected(emp.id, platform);
-      }
-    }, 1600);
-  };
-
-  const retry = () => setPhase("idle");
-
-  return (
-    <div className="im-modal-overlay" ref={overlayRef}
-         onMouseDown={(e) => { if (e.target === overlayRef.current && phase !== "connecting") onClose && onClose(); }}>
-      <div className="im-modal" role="dialog" aria-modal="true">
-        <header className="im-modal-head">
-          <div className="im-modal-title-row">
-            <span className={"avatar-chip av-" + p.tone} style={{ width: 32, height: 32, fontSize: 13 }}>{p.mark}</span>
-            <div className="im-modal-titles">
-              <div className="im-modal-title">接入平台</div>
-              <div className="im-modal-sub">{p.name} · {emp.name}</div>
-            </div>
-          </div>
-          <button className="im-modal-close" onClick={onClose} disabled={phase === "connecting"} aria-label="关闭">
-            <ModalIcon name="x"/>
+    if (employee.status === "interning_ai" || employee.status === "interning_human") {
+      const targetRoute = employee.status === "interning_ai" ? `eval-ai/${employee.id}` : `eval-human/${employee.id}`;
+      const label = employee.status === "interning_ai" ? "进入 AI 评估" : "进入人工评估";
+      return (
+        <div className="action-row">
+          <button className="btn btn-primary btn-sm" onClick={evt => { evt.stopPropagation(); go(targetRoute); }}>
+            {label}
           </button>
-        </header>
-
-        {/* ============ body switches by phase ============ */}
-        {(phase === "idle" || phase === "connecting") && (
-          <div className="im-modal-body">
-            <div className="im-modal-field-label">接入模式</div>
-            <div className="im-mode-row">
-              <button className={"im-mode " + (mode === "ws"  ? "on" : "")}
-                      disabled={phase === "connecting"}
-                      onClick={() => setMode("ws")}>WebSocket 长连接（推荐）</button>
-              <button className={"im-mode " + (mode === "url" ? "on" : "")}
-                      disabled={phase === "connecting"}
-                      onClick={() => setMode("url")}>使用 URL 回调</button>
-            </div>
-
-            <div className="im-mode-tip">{form.tip}</div>
-
-            <div className={"im-cred-grid " + (fields.length === 3 ? "col-1" : "")}>
-              {fields.map((f) => (
-                <div className="im-field" key={f.key}>
-                  <label>{f.label} · 必填</label>
-                  <input
-                    type={/secret|aes|token/i.test(f.key) ? "password" : "text"}
-                    placeholder={f.hint}
-                    value={values[f.key] || ""}
-                    disabled={phase === "connecting"}
-                    onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {phase === "connecting" && (
-              <div className="im-status-banner connecting">
-                <ModalIcon name="loader"/>
-                <div>
-                  <div className="im-status-banner-title">正在与 {p.name} 建立连接…</div>
-                  <div className="im-status-banner-text">校验凭据并下发会话密钥，请稍候 (~2s)</div>
-                </div>
-              </div>
-            )}
-
-            <footer className="im-modal-foot">
-              <button className="action-ghost" onClick={onClose} disabled={phase === "connecting"}>取消</button>
-              <button className="action-primary" onClick={submit}
-                      disabled={!allFilled || phase === "connecting"}>
-                {phase === "connecting" ? "连接中…" : "注册并连接"}
-              </button>
-            </footer>
-          </div>
-        )}
-
-        {phase === "success" && (
-          <div className="im-modal-body result">
-            <div className="im-result-card success">
-              <div className="im-result-icon"><ModalIcon name="check"/></div>
-              <div className="im-result-text">
-                <div className="im-result-title">已成功连接 {p.name}</div>
-                <div className="im-result-sub">
-                  {emp.name} 现在可以通过{p.name} 接收和回复消息。连接方式：{mode === "ws" ? "WebSocket 长连接" : "URL 回调"}
-                </div>
-              </div>
-            </div>
-            <div className="im-result-meta">
-              <div><span>连接 ID</span><b>conn_{Math.random().toString(36).slice(2, 9)}</b></div>
-              <div><span>建立时间</span><b>刚刚</b></div>
-              <div><span>会话密钥</span><b>•••• •••• 已下发</b></div>
-            </div>
-            <footer className="im-modal-foot">
-              <button className="action-primary" onClick={onClose}>完成</button>
-            </footer>
-          </div>
-        )}
-
-        {phase === "error" && (
-          <div className="im-modal-body result">
-            <div className="im-result-card error">
-              <div className="im-result-icon"><ModalIcon name="warn"/></div>
-              <div className="im-result-text">
-                <div className="im-result-title">连接失败</div>
-                <div className="im-result-sub">{errorMsg || "请检查凭据后重试"}</div>
-              </div>
-            </div>
-            <ul className="im-error-checklist">
-              <li>App ID / Secret 是否与开放平台一致</li>
-              <li>是否已在开放平台开启对应能力</li>
-              <li>服务器 IP 是否在白名单内</li>
-            </ul>
-            <footer className="im-modal-foot">
-              <button className="action-ghost" onClick={onClose}>取消</button>
-              <button className="action-primary" onClick={retry}>重新填写并重试</button>
-            </footer>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-
-// ---- from detail.jsx ----
-/* global React */
-/* Employee detail page — opened by clicking a card. */
-const { useState: useDetailState } = React;
-
-// Per-employee detail enrichment. Falls back to sensible defaults.
-const DETAIL_DATA = {
-  "zhaopin-li": {
-    dept: "研发部",
-    owner: "李部门长",
-    version: "v1.0",
-    rounds: 42,
-    lastError: 0,
-    source: [
-      { kind: "模板", label: "HR 助手" },
-      { kind: "部门员工", label: "招聘小慧" },
-      { kind: "部门分身", label: "招聘小慧 · 李工" },
-    ],
-    can: [
-      { ok: true,  text: "根据岗位要求生成 JD 草稿" },
-      { ok: true,  text: "解析简历并按招聘标准排序候选人" },
-      { ok: true,  text: "整理面试录音为结构化纪要" },
-      { ok: true,  text: "回答员工常见的福利、考勤、入离调转问题" },
-      { ok: false, text: "不直接对外发送 offer 与合同" },
-      { ok: false, text: "不替代调薪或法律意见" },
-    ],
-    note: "已上岗实例可以直接进入站内对话，个人资产还可以按需配置 IM 并从平台拉起。",
-  },
-  "shichang-xiaotu": {
-    dept: "研发部",
-    owner: "李部门长",
-    version: "v0.4 (评估)",
-    rounds: 6,
-    lastError: 0,
-    source: [
-      { kind: "模板", label: "市场动态助手" },
-      { kind: "部门员工", label: "市场小图" },
-      { kind: "部门分身", label: "市场小图 · 我的版" },
-    ],
-    can: [
-      { ok: true,  text: "聚合每周市场动态并生成摘要" },
-      { ok: true,  text: "按品类筛选竞品事件" },
-      { ok: false, text: "未通过评估前不直接对外推送" },
-    ],
-    note: "人工评估中：输出仅你可见；通过评估后将自动上岗。",
-  },
-  "zhaopin-offer": {
-    dept: "研发部",
-    owner: "李部门长",
-    version: "v0.7 (评估)",
-    rounds: 8,
-    lastError: 0,
-    source: [
-      { kind: "模板", label: "HR 助手" },
-      { kind: "部门员工", label: "招聘小慧" },
-      { kind: "部门分身", label: "招聘小慧 · 李工" },
-      { kind: "私人定制", label: "招聘小慧 · 我的 Offer 版" },
-    ],
-    can: [
-      { ok: true,  text: "测算 offer 现金 / 期权 / 签字费方案" },
-      { ok: true,  text: "生成谈判脚本草稿" },
-      { ok: false, text: "评估期内禁止直接对候选人发送" },
-    ],
-    note: "AI 评估中：仅你可见，进度达 100% 后会请求人工评估。",
-  },
-  "xingye-xiaoyan": {
-    dept: "研发部",
-    owner: "李部门长",
-    version: "v1.2",
-    rounds: 19,
-    lastError: 1,
-    source: [
-      { kind: "模板", label: "行业研究助手" },
-      { kind: "部门员工", label: "行业小研" },
-      { kind: "部门分身", label: "行业小研 · 李工" },
-    ],
-    can: [
-      { ok: true,  text: "AI Infra 赛道周报推送" },
-      { ok: true,  text: "公开招投标监控" },
-      { ok: true,  text: "公司公开材料梳理" },
-      { ok: false, text: "不引用未授权的付费数据库" },
-    ],
-    note: "通过企业微信推送，订阅项可在 IM 接入区配置。",
-  },
-  "zhaopin-xiaozhao": {
-    dept: "研发部",
-    owner: "李部门长",
-    version: "v1.0",
-    rounds: 14,
-    lastError: 0,
-    source: [
-      { kind: "模板", label: "HR 助手" },
-      { kind: "部门员工", label: "招聘小慧" },
-      { kind: "部门分身", label: "招聘小慧 · 李工" },
-      { kind: "私人定制", label: "招聘小慧 · 校招专版" },
-    ],
-    can: [
-      { ok: true,  text: "校招简历筛选与排序" },
-      { ok: true,  text: "组织面试官分配与时间表" },
-      { ok: true,  text: "校招专属面试题分发" },
-      { ok: false, text: "不直接代发 offer" },
-    ],
-    note: "私人定制版本：基于部门分身定制了校招场景的题库与排序权重。",
-  },
-  "wenan-xiaoshu": {
-    dept: "研发部",
-    owner: "李部门长",
-    version: "v0.9",
-    rounds: 5,
-    lastError: 2,
-    source: [
-      { kind: "模板", label: "对外写作助手" },
-      { kind: "部门员工", label: "文案小书" },
-      { kind: "部门分身", label: "文案小书 · 李工" },
-    ],
-    can: [
-      { ok: true,  text: "把会议纪要整理成对外文稿" },
-      { ok: true,  text: "客户邮件 / 内部通告改写" },
-      { ok: false, text: "近期错误率超过阈值，已转入已退役" },
-    ],
-    note: "已退役：会话功能已关闭。重新启用后将进入 AI 评估，再次上岗。",
-  },
-};
-
-const IM_PROVIDERS = [
-  { key: "feishu",   name: "飞书", mark: "飞", method: "WebSocket 长连接", lastSync: "今天 14:08" },
-  { key: "dingtalk", name: "钉钉", mark: "钉", method: "URL 回调",          lastSync: "昨天 18:22" },
-  { key: "wecom",    name: "企微", mark: "企", method: "尚未完成接入",       lastSync: null },
-];
-
-function DetailIcon({ name }) {
-  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
-  switch (name) {
-    case "back":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M15 18l-6-6 6-6"/></svg>;
-    case "arrow-right":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M5 12h14M13 5l7 7-7 7"/></svg>;
-    case "check":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M5 12l4 4 10-10"/></svg>;
-    case "x":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M6 6l12 12M18 6L6 18"/></svg>;
-    case "users":
-      return <svg viewBox="0 0 24 24" {...stroke}>
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-      </svg>;
-    case "clock":
-      return <svg viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
-    case "shield":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
-    case "sparkle":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>;
-    case "tag":
-      return <svg viewBox="0 0 24 24" {...stroke}><path d="M3 12l9 9 9-9-9-9H3v9z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/></svg>;
-    case "info":
-      return <svg viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>;
-    default:
-      return null;
-  }
-}
-
-function SourceChain({ source }) {
-  return (
-    <div className="source-chain">
-      {source.map((s, i) => (
-        <React.Fragment key={i}>
-          <span className={"source-node " + (i === source.length - 1 ? "last" : "")}>
-            <span className="source-kind">{s.kind}</span>
-            <span className="source-label">{s.label}</span>
-          </span>
-          {i < source.length - 1 && (
-            <span className="source-sep"><DetailIcon name="arrow-right"/></span>
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-function MoreMenu({ items }) {
-  const [open, setOpen] = useDetailState(false);
-  const ref = React.useRef(null);
-  React.useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-  return (
-    <div className="more-menu" ref={ref}>
-      <button
-        type="button"
-        className={"action-ghost more-btn " + (open ? "open" : "")}
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        <span>更多</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-             strokeLinecap="round" strokeLinejoin="round"
-             className={"more-chev " + (open ? "open" : "")}>
-          <path d="M6 9l6 6 6-6"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="more-menu-pop">
-          {items.map((it, i) => (
-            <button
-              key={i}
-              type="button"
-              className={"more-item " + (it.danger ? "danger" : "")}
-              onClick={() => { setOpen(false); it.onClick && it.onClick(); }}
-            >
-              {it.label}
-            </button>
-          ))}
+          <button className="btn btn-ghost btn-sm" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>查看进度</button>
         </div>
-      )}
-    </div>
-  );
-}
+      );
+    }
 
-function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM }) {
-  const status = emp.status;
-  if (status === "live") {
+    if (employee.status === "failed") {
+      return (
+        <div className="action-row">
+          <button className="btn btn-ghost btn-sm" onClick={evt => { evt.stopPropagation(); go(`review/${employee.id}`); }}>查看报告</button>
+          <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>继续雇佣</button>
+        </div>
+      );
+    }
+
     return (
-      <div className="action-stack">
-        <button className="action-primary" onClick={onStartChat}>开始对话</button>
-        <button className="action-ghost" onClick={onGoIM}>去 IM</button>
-        <MoreMenu items={[
-          { label: "私人定制" },
-          { label: "退役", danger: true },
-        ]}/>
+      <div className="action-row">
+        <button className="btn btn-ghost btn-sm" onClick={evt => { evt.stopPropagation(); go(`employee/${employee.id}`); }}>查看历史</button>
+        {employee.parent && <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`clone/${employee.parent}`); }}>重新复制</button>}
       </div>
     );
   }
-  if (status === "evaluating") {
-    return (
-      <div className="action-stack">
-        <button className="action-primary"><span>进入 AI 评估</span><DetailIcon name="arrow-right"/></button>
-        <button className="action-ghost">查看进度</button>
-        <button className="action-ghost subtle">终止评估</button>
-      </div>
-    );
-  }
-  if (status === "humanEval") {
-    return (
-      <div className="action-stack">
-        <button className="action-primary"><span>进入人工评估</span><DetailIcon name="arrow-right"/></button>
-        <button className="action-ghost">查看进度</button>
-        <button className="action-ghost subtle">终止评估</button>
-      </div>
-    );
-  }
-  if (status === "pending") {
-    return (
-      <div className="action-stack">
-        <button className="action-primary" onClick={() => onReEnable && onReEnable(emp.id)}>
-          <span>重新启用</span><DetailIcon name="arrow-right"/>
-        </button>
-        <button className="action-ghost subtle" onClick={() => onRemove && onRemove(emp.id)}>删除卡片</button>
-      </div>
-    );
-  }
-  return null;
-}
-
-function CapabilitiesIntro({ emp, d }) {
-  const [open, setOpen] = useDetailState(false);
-  const list = d.can || [];
-  const PREVIEW = 3;
-  const showAll = open || list.length <= PREVIEW;
-  const visible = showAll ? list : list.slice(0, PREVIEW);
-  const hidden  = list.length - PREVIEW;
 
   return (
-    <section className="detail-card intro-card">
-      <div className="detail-card-head">
-        <h3>员工介绍</h3>
-        <div className="intro-quickstats">
-          <IntroStat icon="sparkle" value={d.rounds} label="累计对话"/>
-          <IntroStat icon="clock"   value={emp.lastUpdate} label="上次操作"/>
-          <IntroStat icon="shield"  value={d.lastError ?? 0} label="最近错误"/>
-          <IntroStat icon="tag"     value={d.version} label="实例版本"/>
+    <div className="page">
+      <div className="page-header hero-header">
+        <div>
+          <span className="eyebrow">{viewer.name} 的个人资产</span>
+          <h1 className="page-title">我的数字员工</h1>
+          <p className="page-sub">这里只展示你本人拥有的"我的分身"和"私人定制"。`live` 卡片主动作统一改为"开始对话"，直接进入站内会话。</p>
         </div>
-      </div>
-
-      <ul className={"capability-list " + (showAll ? "" : "clamped")}>
-        {visible.map((c, i) => (
-          <li key={i} className={c.ok ? "ok" : "no"}>
-            <span className="cap-icon"><DetailIcon name={c.ok ? "check" : "x"}/></span>
-            <span>{c.text}</span>
-          </li>
-        ))}
-      </ul>
-
-      {list.length > PREVIEW && (
-        <button
-          type="button"
-          className="intro-toggle"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-        >
-          <span>{open ? "收起" : `全部展开·还有 ${hidden} 项`}</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-               strokeLinecap="round" strokeLinejoin="round"
-               className={"intro-chev " + (open ? "open" : "")}>
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </button>
-      )}
-
-      {d.note && (
-        <div className="detail-note compact">
-          <DetailIcon name="info"/>
-          <div>
-            <div className="detail-note-title">状态承接说明</div>
-            <div className="detail-note-text">{d.note}</div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function IntroStat({ icon, value, label }) {
-  return (
-    <div className="intro-stat">
-      <div className="intro-stat-icon"><DetailIcon name={icon}/></div>
-      <div className="intro-stat-text">
-        <div className="intro-stat-value">{value ?? "—"}</div>
-        <div className="intro-stat-label">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, statusMap }) {
-  const d = DETAIL_DATA[emp.id] || {};
-  const s = statusMap[emp.status];
-
-  const handleReEnable = (id) => {
-    onReEnable && onReEnable(id);
-    onBack && onBack(); // 重新启用后回到列表，让用户看到新的状态
-  };
-  const handleRemove = (id) => {
-    onRemove && onRemove(id);
-    onBack && onBack();
-  };
-
-  return (
-    <div className="detail-page">
-      <button className="detail-back" onClick={onBack}>
-        <DetailIcon name="back"/>
-        <span>返回 我的数字员工</span>
-      </button>
-
-      {/* ============= header card ============= */}
-      <section className="detail-hero">
-        <div className="detail-hero-main">
-          <div className={"detail-avatar av-" + emp.avatarTone}>{emp.initial}</div>
-          <div className="detail-hero-text">
-            <div className="detail-title-row">
-              <h1 className="detail-name">{emp.name}</h1>
-              <span className={"status-dot " + s.cls}><span className="dot"/>{s.label}</span>
-              <span className={"sub-pill " + (emp.role === "部门分身" ? "role-mine" : "role-custom")}>
-                {emp.role}
-              </span>
-            </div>
-            <div className="detail-meta">
-              所属部门 {d.dept || "—"}
-              <span className="dot-sep">·</span>
-              Owner {d.owner || "—"}
-              <span className="dot-sep">·</span>
-              最近更新 {emp.lastUpdate}
-            </div>
-            <p className="detail-desc">{emp.desc}</p>
-          </div>
-        </div>
-        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM}/>
-      </section>
-
-      {/* ============= unified intro card ============= */}
-      <CapabilitiesIntro emp={emp} d={d}/>
-
-      {/* ============= IM zone — 评估中不展示，与卡片保持一致 ============= */}
-      {emp.status !== "evaluating" && emp.status !== "humanEval" && (
-        <section className="detail-card im-zone">
-          <div className="detail-card-head">
-            <h3>IM 接入区</h3>
-          </div>
-          <div className="im-grid">
-            {IM_PROVIDERS.map((p) => {
-              const connected = emp.im[p.key] === "connected";
-              return (
-                <div key={p.key} className={"im-card " + (connected ? "on" : "off")}>
-                  <div className="im-card-head">
-                    <div className="im-card-mark">{p.mark}</div>
-                    <div className="im-card-name">{p.name}</div>
-                    <div className="im-card-state">
-                      <span className={"li-badge " + (connected ? "live" : "pending")}>
-                        {connected ? "已连接" : "未配置"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="im-card-meta">
-                    {connected
-                      ? <>{p.method}{p.lastSync && <> · 今天 {p.lastSync.replace("今天 ", "")}</>}</>
-                      : "尚未完成接入"}
-                  </div>
-                  <button
-                    className="action-ghost small"
-                    onClick={() => {
-                      if (connected) {
-                        window.__launchIM__ && window.__launchIM__(p.key);
-                      } else {
-                        onConfigurePlatform && onConfigurePlatform(p.key);
-                      }
-                    }}
-                  >
-                    {connected ? `去 ${p.name}` : "配置 IM"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-function DetailStat({ icon, value, label, big }) {
-  return (
-    <div className={"detail-stat " + (big ? "big" : "")}>
-      <div className="detail-stat-icon"><DetailIcon name={icon}/></div>
-      <div className="detail-stat-value">{value ?? "—"}</div>
-      <div className="detail-stat-label">{label}</div>
-    </div>
-  );
-}
-
-
-// ---- from app.jsx (adapted) ----
-/* global React, ReactDOM */
-const { useState: _myUs, useRef: _myUr, useEffect: _myUe, useMemo: _myUm } = React;
-const { employees: _myEmps, conversations: initialConvos } = window.__DATA__;
-
-/* ---------------- icons ---------------- */
-const I = {
-  users: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg>
-  ),
-  robot: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="8" width="18" height="12" rx="3"/>
-      <path d="M12 8V4"/>
-      <circle cx="12" cy="3" r="1"/>
-      <circle cx="9" cy="14" r="1" fill="currentColor"/>
-      <circle cx="15" cy="14" r="1" fill="currentColor"/>
-    </svg>
-  ),
-  spark: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>
-    </svg>
-  ),
-  shield: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-    </svg>
-  ),
-  clock: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M12 7v5l3 2"/>
-    </svg>
-  ),
-  grid: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3"  width="7" height="7" rx="1"/>
-      <rect x="14" y="3" width="7" height="7" rx="1"/>
-      <rect x="3" y="14" width="7" height="7" rx="1"/>
-      <rect x="14" y="14" width="7" height="7" rx="1"/>
-    </svg>
-  ),
-  list: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 6h13M8 12h13M8 18h13"/>
-      <circle cx="4" cy="6"  r="1" fill="currentColor"/>
-      <circle cx="4" cy="12" r="1" fill="currentColor"/>
-      <circle cx="4" cy="18" r="1" fill="currentColor"/>
-    </svg>
-  ),
-  search: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7"/>
-      <path d="M21 21l-4.3-4.3"/>
-    </svg>
-  ),
-  lock: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="11" width="16" height="10" rx="2"/>
-      <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
-    </svg>
-  ),
-  info: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M12 8h.01M11 12h1v5h1"/>
-    </svg>
-  ),
-  send: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 2L11 13"/>
-      <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
-    </svg>
-  ),
-  paperclip: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.5L12 21a5.5 5.5 0 0 1-7.8-7.8L13 4.4a3.7 3.7 0 0 1 5.2 5.2L9.6 18.2a1.8 1.8 0 0 1-2.6-2.6l8-8"/>
-    </svg>
-  ),
-  emoji: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>
-    </svg>
-  ),
-  more: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="5"  cy="12" r="1" fill="currentColor"/>
-      <circle cx="12" cy="12" r="1" fill="currentColor"/>
-      <circle cx="19" cy="12" r="1" fill="currentColor"/>
-    </svg>
-  ),
-  pin: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2v6M9 8h6l2 6H7l2-6zM12 14v8"/>
-    </svg>
-  ),
-};
-
-
-/* ---------------- stats ---------------- */
-function Stats() {
-  const stats = [
-    { icon: I.users, value: 4, label: "实例总数" },
-    { icon: I.robot, value: 2, label: "已上岗" },
-    { icon: I.spark, value: 1, label: "评估中" },
-    { icon: I.shield, value: 1, label: "私人定制" },
-    { icon: I.clock, value: 0, label: "待处理" },
-  ];
-  return (
-    <div className="stats">
-      {stats.map((s, i) => (
-        <div className="stat" key={i}>
-          <div className="stat-icon">{s.icon}</div>
-          <div className="stat-value">{s.value}</div>
-          <div className="stat-label">{s.label}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ---------------- filters + view toggle ---------------- */
-function Toolbar({ filter, setFilter, view, setView, counts }) {
-  const allItems = [
-    { key: "全部", count: counts.all },
-    { key: "已上岗", count: counts.live },
-    { key: "实习中", count: counts.intern },
-    { key: "私人定制", count: counts.custom },
-    { key: "已退役", count: counts.pending },
-  ];
-  // 在列表 · 会话模式下，只展示「全部」页签：在说明只有已上岗的员工才能会话，
-  // 透过左侧列表头部的「已上岗」徽标体现。
-  const items = view === "list"
-    ? allItems.filter((i) => i.key === "全部")
-    : allItems;
-  return (
-    <div className="toolbar">
-      <div className="filters">
-        {items.map((f) => (
-          <button
-            key={f.key}
-            className={"filter " + (filter === f.key ? "on" : "")}
-            onClick={() => setFilter(f.key)}
-          >
-            <span>{f.key}</span>
-            <span className="filter-count">{f.count}</span>
-          </button>
-        ))}
-      </div>
-      <div className="view-toggle">
-        <button className={view === "card" ? "on" : ""} onClick={() => setView("card")}>
-          {I.grid}卡片
-        </button>
-        <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}>
-          {I.list}列表 · 会话
+        <button className="btn btn-ghost" onClick={() => go("dept")}>
+          去部门数字员工 复制一个 →
         </button>
       </div>
-    </div>
-  );
-}
 
-/* ---------------- card view ---------------- */
-const statusMap = {
-  live: { label: "已上岗", cls: "status-live" },
-  evaluating: { label: "AI 评估中", cls: "status-eval" },
-  humanEval: { label: "人工评估中", cls: "status-eval" },
-  pending: { label: "已退役", cls: "status-pending" },
-};
-const tagClass = { HR: "tag-hr", 情报: "tag-info", 写作: "tag-writing" };
+      <window.StatStrip items={[
+        { icon: <window.Icon.users />, value: <span className="tnum">{totals.all}</span>, label: "实例总数" },
+        { icon: <window.Icon.bot />, value: <span className="tnum">{totals.live}</span>, label: "已上岗" },
+        { icon: <window.Icon.spark />, value: <span className="tnum">{totals.evaluating}</span>, label: "评估中" },
+        { icon: <window.Icon.shield />, value: <span className="tnum">{totals.branch}</span>, label: "私人定制" },
+        { icon: <window.Icon.clock />, value: <span className="tnum">{totals.failed}</span>, label: "待处理" }
+      ]} />
 
-function ImPill({ name, state }) {
-  const labelMap = { connected: "已连接", unset: "未配置" };
-  const initialMap = { feishu: "飞", dingtalk: "钉", wecom: "企" };
-  const nameMap = { feishu: "飞书", dingtalk: "钉", wecom: "企微" };
-  return (
-    <span className={"im-pill " + (state === "connected" ? "connected" : "")}>
-      <span style={{ width: 14, textAlign: "center" }}>{initialMap[name]}</span>
-      {nameMap[name]} · {labelMap[state]}
-    </span>
-  );
-}
+      <div className="spacer-24" />
 
-function ImStrip({ im }) {
-  const [open, setOpen] = _myUs(false);
-  const order = ["feishu", "dingtalk", "wecom"];
-  const nameMap = { feishu: "飞书", dingtalk: "钉钉", wecom: "企微" };
-  const initialMap = { feishu: "飞", dingtalk: "钉", wecom: "企" };
-  const connected = order.filter((k) => im[k] === "connected").length;
-  return (
-    <div className={"im-strip " + (open ? "open" : "")}>
-      <button
-        type="button"
-        className="im-strip-head"
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        aria-expanded={open}
-      >
-        <span className="im-strip-label">IM 接入</span>
-        <span className="im-dots">
-          {order.map((k) => (
-            <span
-              key={k}
-              className={"im-dot " + (im[k] === "connected" ? "on" : "off")}
-              title={`${nameMap[k]} · ${im[k] === "connected" ? "已连接" : "未配置"}`}
-            />
-          ))}
-        </span>
-        <span className="im-strip-summary">{connected}/3 已接入</span>
-        <svg className="im-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6"/>
-        </svg>
-      </button>
-      {open && (
-        <ul className="im-strip-list">
-          {order.map((k) => {
-            const on = im[k] === "connected";
+      <div className="subtabs">
+        <button className={`subtab ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>全部</button>
+        <button className={`subtab ${filter === "live" ? "active" : ""}`} onClick={() => setFilter("live")}>已上岗</button>
+        <button className={`subtab ${filter === "evaluating" ? "active" : ""}`} onClick={() => setFilter("evaluating")}>评估中</button>
+        <button className={`subtab ${filter === "branch" ? "active" : ""}`} onClick={() => setFilter("branch")}>私人定制</button>
+        <button className={`subtab ${filter === "failed" ? "active" : ""}`} onClick={() => setFilter("failed")}>待回退</button>
+      </div>
+
+      {list.length === 0 ? (
+        <div className="empty">
+          <div className="ic">🗂</div>
+          <h4>当前筛选下没有你的个人资产</h4>
+          <p>先去"部门数字员工"复制一个 `live` 员工给自己，回来这里就能开始对话或继续定制。</p>
+        </div>
+      ) : (
+        <div className="grid grid-3">
+          {list.map(employee => {
+            // 待实习状态的员工点击卡片直接进入对应的评估页面
+            const handleClick = () => {
+              if (employee.status === "live") {
+                go(`chat/${employee.id}`);
+              } else if (employee.status === "interning_ai") {
+                go(`eval-ai/${employee.id}`);
+              } else if (employee.status === "interning_human") {
+                go(`eval-human/${employee.id}`);
+              } else {
+                go(`employee/${employee.id}`);
+              }
+            };
             return (
-              <li key={k} className={on ? "on" : "off"}>
-                <span className="im-app">
-                  <span className="im-app-mark">{initialMap[k]}</span>
-                  {nameMap[k]}
-                </span>
-                <span className="im-state">
-                  <span className={"im-dot " + (on ? "on" : "off")}/>
-                  {on ? "已连接" : "未配置"}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM }) {
-  const s = statusMap[emp.status];
-  const isLive   = emp.status === "live";
-  const isAiEval = emp.status === "evaluating";
-  const isHumanEval = emp.status === "humanEval";
-  const isRetired = emp.status === "pending";
-  const stop = (fn) => (e) => { e.stopPropagation(); fn && fn(); };
-  return (
-    <div className="card" onClick={() => onOpen && onOpen(emp.id)} role="button" tabIndex={0}>
-      <div className="card-head">
-        <div className={"avatar-chip av-" + emp.avatarTone}>{emp.initial}</div>
-        <div className="card-head-text">
-          <div className="card-name">
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.name}</span>
-            <span className={"status-dot " + s.cls}>
-              <span className="dot"/>{s.label}
-            </span>
-          </div>
-          <div className="card-sub">
-            <span className={"sub-pill " + (emp.role === "部门分身" ? "role-mine" : "role-custom")}>{emp.role}</span>
-            <span>· 最近更新 {emp.lastUpdate}</span>
-          </div>
-        </div>
-      </div>
-
-      <p className="card-desc">{emp.desc}</p>
-
-      {isAiEval && (
-        <div className="progress">
-          <div className="progress-head">
-            <span>AI 评估进度</span>
-            <span>{emp.progress}%</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-bar" style={{ width: emp.progress + "%" }}/>
-          </div>
-        </div>
-      )}
-
-      {!isAiEval && !isHumanEval && <ImStrip im={emp.im}/>}
-
-      <div className="card-foot">
-        <div className="last-op">
-          <div className="last-op-label">上次操作</div>
-          <div className="last-op-time">{emp.lastUpdate}</div>
-        </div>
-        <div className="foot-actions">
-          {isLive && (
-            <>
-              <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); onGoIM && onGoIM(emp.id); }}>去 IM</button>
-              <button className="btn-primary" onClick={(e) => { e.stopPropagation(); onStartChat && onStartChat(emp.id); }}>开始对话</button>
-            </>
-          )}
-          {isAiEval && (
-            <button className="btn-primary" onClick={(e) => e.stopPropagation()}>进入 AI 评估</button>
-          )}
-          {isHumanEval && (
-            <button className="btn-primary" onClick={(e) => e.stopPropagation()}>进入人工评估</button>
-          )}
-          {isRetired && (
-            <>
-              <button className="btn-ghost danger" onClick={stop(() => onRemove && onRemove(emp.id))}>删除卡片</button>
-              <button className="btn-primary" onClick={stop(() => onReEnable && onReEnable(emp.id))}>重新启用</button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CardView({ list, onReEnable, onRemove, onOpen, onStartChat, onGoIM }) {
-  return (
-    <div className="grid">
-      {list.map((e) => <Card key={e.id} emp={e} onReEnable={onReEnable} onRemove={onRemove} onOpen={onOpen} onStartChat={onStartChat} onGoIM={onGoIM}/>)}
-    </div>
-  );
-}
-
-/* ---------------- list + chat view ---------------- */
-function FileChip({ kind }) {
-  const tone = window.__FILE_TONE__ || { file: { tone: "neutral", label: "FILE" }};
-  const t = tone[kind] || tone.file;
-  return <span className={"file-chip tone-" + t.tone}>{t.label}</span>;
-}
-
-function ListChatView({ list, requestedActiveId, onRequestConsumed, onGoIM }) {
-  // Only employees who are 已上岗 can be conversed with.
-  const chatable = _myUm(() => list.filter((e) => e.status === "live"), [list]);
-  const [activeId, setActiveId] = _myUs(requestedActiveId || chatable[0]?.id);
-  const [query, setQuery] = _myUs("");
-  const [convos, setConvos] = _myUs(initialConvos);
-  const [draft, setDraft] = _myUs("");
-  const [attachments, setAttachments] = _myUs([]);
-  const [showOutput, setShowOutput] = _myUs(false);
-  const [outputs, setOutputs] = _myUs(() => window.__CHAT_OUTPUTS__ || {});
-  const [outputQuery, setOutputQuery] = _myUs("");
-  const [listCollapsed, setListCollapsed] = _myUs(false);
-  const streamRef = _myUr(null);
-  const textareaRef = _myUr(null);
-  const fileInputRef = _myUr(null);
-
-  // When a card or detail page requests opening this employee, pick it up
-  _myUe(() => {
-    if (requestedActiveId) {
-      setActiveId(requestedActiveId);
-      onRequestConsumed && onRequestConsumed();
-    }
-    // eslint-disable-next-line
-  }, [requestedActiveId]);
-
-  // Ensure active employee is still in chatable list
-  _myUe(() => {
-    if (!chatable.find((e) => e.id === activeId) && chatable[0]) setActiveId(chatable[0].id);
-  }, [chatable, activeId]);
-
-  const visible = _myUm(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return chatable;
-    return chatable.filter((e) => e.name.toLowerCase().includes(q) || (e.tag||"").toLowerCase().includes(q));
-  }, [chatable, query]);
-
-  const active = chatable.find((e) => e.id === activeId) || chatable[0];
-  const thread = convos[activeId] || [];
-  const activeOutputs = outputs[activeId] || [];
-  const visibleOutputs = _myUm(() => {
-    const q = outputQuery.trim().toLowerCase();
-    if (!q) return activeOutputs;
-    return activeOutputs.filter((f) => f.name.toLowerCase().includes(q));
-  }, [activeOutputs, outputQuery]);
-
-  // Auto-scroll to bottom when switching threads or sending
-  _myUe(() => {
-    const el = streamRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [activeId, thread.length]);
-
-  // Auto-grow textarea
-  _myUe(() => {
-    const t = textareaRef.current;
-    if (!t) return;
-    t.style.height = "auto";
-    t.style.height = Math.min(t.scrollHeight, 120) + "px";
-  }, [draft]);
-
-  const lastMsgPreview = (id) => {
-    const msgs = convos[id] || [];
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role !== "system") {
-        const prefix = msgs[i].role === "user" ? "你：" : "";
-        return prefix + msgs[i].text.replace(/\n/g, " ");
-      }
-    }
-    return "暂无消息";
-  };
-  const lastMsgTime = (id) => {
-    const msgs = convos[id] || [];
-    return msgs[msgs.length - 1]?.time || "";
-  };
-
-  const handleUploadClick = () => fileInputRef.current?.click();
-  const handleFiles = (e) => {
-    const files = Array.from(e.target.files || []);
-    const next = files.map((f, i) => ({
-      id: "u" + Date.now() + "-" + i,
-      name: f.name,
-      size: (window.__formatSize__ || ((n) => n + " B"))(f.size),
-      kind: (window.__inferKind__ || (() => "file"))(f.name),
-    }));
-    setAttachments((prev) => [...prev, ...next]);
-    e.target.value = "";
-  };
-  const removeAttachment = (id) =>
-    setAttachments((prev) => prev.filter((a) => a.id !== id));
-
-  const send = () => {
-    const text = draft.trim();
-    if ((!text && attachments.length === 0) || !active) return;
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, "0");
-    const mm = String(now.getMinutes()).padStart(2, "0");
-    const userMsg = {
-      role: "user",
-      text: text || "(已上传附件)",
-      time: `今天 ${hh}:${mm}`,
-      files: attachments,
-    };
-    setConvos((prev) => ({ ...prev, [active.id]: [...(prev[active.id] || []), userMsg] }));
-    setDraft("");
-    setAttachments([]);
-
-    setTimeout(() => {
-      const replies = {
-        "zhaopin-li": "收到。我现在去拉，预计 1 分钟内反馈。",
-        "zhaopin-offer": "已记录。等本轮 AI 评估完成后会重新跑算。",
-        "xingye-xiaoyan": "好的，我加入本周观察池。",
-        "wenan-xiaoshu": "明白，我重写一版你看看。",
-      };
-      const r = replies[active.id] || "好的，我马上处理。";
-      const t2 = new Date();
-      const h2 = String(t2.getHours()).padStart(2, "0");
-      const m2 = String(t2.getMinutes()).padStart(2, "0");
-      setConvos((prev) => ({
-        ...prev,
-        [active.id]: [...(prev[active.id] || []), { role: "agent", text: r, time: `今天 ${h2}:${m2}` }],
-      }));
-
-      // 25% chance to produce a file
-      if (Math.random() < 0.25) {
-        const newFile = {
-          id: "f-gen-" + Date.now(),
-          name: `自动整理_${h2}${m2}.md`,
-          kind: "md",
-          size: "8 KB",
-          time: "刚刚",
-          from: "针对你的最近一条消息",
-          fresh: true,
-        };
-        setOutputs((prev) => ({ ...prev, [active.id]: [newFile, ...(prev[active.id] || [])] }));
-      }
-    }, 850);
-  };
-
-  const onKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  };
-
-  const folderIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-      <circle cx="17" cy="14" r="2.2" fill="currentColor" opacity="0.18"/>
-    </svg>
-  );
-
-  return (
-    <div className={"split " + (showOutput ? "with-output" : "") + (listCollapsed ? " list-collapsed" : "")}>
-      {/* LEFT: employee list */}
-      <aside className="list-pane">
-        <div className="list-head">
-          <div className="list-title">
-            <h3>我的数字员工</h3>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span className="list-tag-live"><span className="dot"/>只含已上岗</span>
-              <button className="list-collapse-btn" onClick={() => setListCollapsed(true)} title="收起列表">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
-                  <path d="M15 18l-6-6 6-6"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div className="search">
-            {I.search}
-            <input
-              type="text"
-              placeholder="搜索数字员工 / 标签"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="list-scroll">
-          {visible.map((e) => (
-            <div
-              key={e.id}
-              className={"list-item " + (e.id === active?.id ? "active" : "")}
-              onClick={() => setActiveId(e.id)}
-            >
-              <div className={"avatar-chip av-" + e.avatarTone}>{e.initial}</div>
-              <div className="li-body">
-                <div className="li-row1">
-                  <div className="li-name">{e.name}</div>
-                  <div className="li-time">{lastMsgTime(e.id)}</div>
-                </div>
-                <div className="li-row2">
-                  <div className="li-preview">{lastMsgPreview(e.id)}</div>
-                  {e.role === "私人定制" && (
-                    <span className="li-badge custom">私人定制</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-          {visible.length === 0 && (
-            <div style={{ textAlign: "center", color: "var(--ink-4)", fontSize: 13, padding: 40 }}>
-              没有匹配的数字员工
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* MIDDLE: chat pane */}
-      <section className="chat-pane">
-        {listCollapsed && (
-          <button className="list-expand-btn" onClick={() => setListCollapsed(false)} title="展开列表">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
-              <path d="M9 18l6-6-6-6"/>
-            </svg>
-            <span>列表</span>
-          </button>
-        )}
-        {active && (
-          <>
-            <header className="chat-head">
-              <div className={"avatar-chip av-" + active.avatarTone}>{active.initial}</div>
-              <div className="chat-head-meta">
-                <div className="chat-head-name">
-                  {active.name}
-                </div>
-                <div className="chat-head-sub">
-                  <span>{active.role}</span>
-                  {active.tag && <span>· {active.tag}</span>}
-                  <span>· 最近更新 {active.lastUpdate}</span>
-                </div>
-              </div>
-              <div className="chat-head-actions">
-                <button
-                  className={"output-toggle " + (showOutput ? "on" : "")}
-                  title={showOutput ? "收起会话产出面板" : "展开会话产出面板"}
-                  onClick={() => setShowOutput((v) => !v)}
-                >
-                  {folderIcon}
-                  <span>产出</span>
-                  {activeOutputs.length > 0 && (
-                    <span className="output-toggle-count">{activeOutputs.length}</span>
-                  )}
-                  <svg
-                    className={"output-toggle-chev " + (showOutput ? "open" : "")}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                  >
-                    <path d={showOutput ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"}/>
-                  </svg>
-                </button>
-              </div>
-            </header>
-
-            <div className="chat-stream" ref={streamRef}>
-              {thread.map((m, i) => {
-                if (m.role === "system") {
-                  return (
-                    <div key={i} className="msg system">
-                      <div className="msg-bubble">{m.text}</div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={i} className={"msg " + m.role}>
-                    <div className={"avatar-chip " + (m.role === "agent" ? "av-" + active.avatarTone : "")}>
-                      {m.role === "agent" ? active.initial : "李"}
-                    </div>
-                    <div className="msg-col">
-                      {m.files && m.files.length > 0 && (
-                        <div className="msg-files">
-                          {m.files.map((f) => (
-                            <div className="msg-file" key={f.id}>
-                              <FileChip kind={f.kind}/>
-                              <div className="msg-file-meta">
-                                <div className="msg-file-name">{f.name}</div>
-                                <div className="msg-file-sub">{f.size}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {m.text && <div className="msg-bubble">{m.text}</div>}
-                      <div className="msg-time">{m.time}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="composer">
-              {attachments.length > 0 && (
-                <div className="attach-row">
-                  {attachments.map((a) => (
-                    <div className="attach-chip" key={a.id}>
-                      <FileChip kind={a.kind}/>
-                      <span className="attach-name">{a.name}</span>
-                      <span className="attach-size">{a.size}</span>
-                      <button className="attach-remove" onClick={() => removeAttachment(a.id)}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                      </button>
-                    </div>
-                  ))}
+            <window.EmployeeCard
+              key={employee.id}
+              emp={employee}
+              onClick={handleClick}
+              extraPanel={(
+                <div className="inline-panel">
+                  <div className="inline-panel-title">IM 接入状态</div>
+                  <window.IMStatusStrip employeeId={employee.id} onClick={() => setJumpEmployee(employee)} />
                 </div>
               )}
-              <div className="composer-box">
-                <textarea
-                  ref={textareaRef}
-                  rows="1"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={onKey}
-                  placeholder={`和 ${active.name} 说点什么… (Enter 发送，Shift+Enter 换行)`}
-                />
-                <div className="composer-foot">
-                  <div className="composer-tools">
-                    <button className="tool-btn" title="上传附件" onClick={handleUploadClick}>
-                      {I.paperclip}
-                    </button>
-                    <input
-                      type="file"
-                      multiple
-                      ref={fileInputRef}
-                      style={{ display: "none" }}
-                      onChange={handleFiles}
-                    />
-                    <span className="composer-hint">支持上传 PDF / Word / Excel / 图片 等，单次 ≤ 20MB</span>
-                  </div>
-                  <button className="send-btn" disabled={!draft.trim() && attachments.length === 0} onClick={send}>
-                    发送 {I.send}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* RIGHT: output panel (toggleable) */}
-      {showOutput && active && (
-        <aside className="output-panel">
-          <header className="output-head">
-            <div className="output-titles">
-              <h3>本会话产出</h3>
-              <span className="output-count">{activeOutputs.length} 个文件</span>
-            </div>
-            <div className="output-search">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-              <input
-                type="text"
-                placeholder="搜索产出文件"
-                value={outputQuery}
-                onChange={(e) => setOutputQuery(e.target.value)}
-              />
-            </div>
-          </header>
-          <div className="output-list">
-            {visibleOutputs.length === 0 ? (
-              <div className="output-empty">
-                <svg viewBox="0 0 64 64" fill="none">
-                  <rect x="14" y="14" width="36" height="44" rx="4" stroke="currentColor" strokeWidth="1.6"/>
-                  <path d="M20 26h24M20 34h24M20 42h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                  <circle cx="48" cy="14" r="6" fill="currentColor" opacity="0.15"/>
-                </svg>
-                <div className="output-empty-title">{outputQuery ? "没有匹配的文件" : "暂未产出文件"}</div>
-                <div className="output-empty-sub">
-                  {outputQuery ? "换个关键词试试" : "对话过程中由数字员工生成的文件会出现在这里。"}
-                </div>
-              </div>
-            ) : (
-              visibleOutputs.map((f) => (
-                <div className={"output-card " + (f.fresh ? "fresh" : "")} key={f.id}>
-                  <FileChip kind={f.kind}/>
-                  <div className="output-card-body">
-                    <div className="output-card-name">{f.name}</div>
-                    <div className="output-card-meta">
-                      <span>{f.size}</span><span>·</span><span>{f.time}</span>
-                    </div>
-                    {f.from && <div className="output-card-from">来自：{f.from}</div>}
-                  </div>
-                  <button className="output-card-action" title="下载">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 12l6 6 6-6"/><path d="M4 21h16"/></svg>
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
+              cardHint={employee.status === "live" ? "主动作已切换为站内对话；详情和 IM 配置保留为次要动作。" : ""}
+              footerActions={renderFooter(employee)}
+            />
+          )})}
+        </div>
       )}
+
+      <window.IMPickerModal
+        open={!!jumpEmployee}
+        employee={jumpEmployee}
+        onClose={() => setJumpEmployee(null)}
+        onConfig={() => {
+          const current = jumpEmployee;
+          setJumpEmployee(null);
+          if (current) go(`im/${current.id}`);
+        }}
+      />
     </div>
   );
 }
-
-/* ---------------- root ---------------- */
-function MyPage({ role, go }) {
-  const [filter, setFilter] = _myUs("全部");
-  const [view, setView] = _myUs("card");
-  const [empList, setEmpList] = _myUs(_myEmps);
-  const [detailId, setDetailId] = _myUs(null);
-  const [imCfgId, setImCfgId] = _myUs(null);
-  const [chatEmpId, setChatEmpId] = _myUs(null);
-  const [goImEmpId, setGoImEmpId] = _myUs(null);
-  const [modalState, setModalState] = _myUs({ open: false, empId: null, platform: null });
-
-  const openConfigure = (empId, platform) => setModalState({ open: true, empId, platform });
-  const closeModal = () => setModalState((s) => ({ ...s, open: false }));
-  const markConnected = (empId, platform) =>
-    setEmpList((L) => L.map((e) =>
-      e.id === empId ? { ...e, im: { ...e.im, [platform]: "connected" } } : e
-    ));
-
-  // 从卡片或详情页点「开始对话」时：切到列表 · 会话视图 + 选中该员工
-  const startChat = (empId) => {
-    setDetailId(null);
-    setView("list");
-    setChatEmpId(empId);
-  };
-
-  const reEnable = (id) =>
-    setEmpList((L) => L.map((e) => (e.id === id ? { ...e, status: "live", lastUpdate: "刚刚重新启用" } : e)));
-  const remove = (id) =>
-    setEmpList((L) => L.filter((e) => e.id !== id));
-
-  const list = _myUm(() => {
-    // 在列表模式下只能选到可对话的员工，面包调整为已上岗。
-    const pool = view === "list" ? empList.filter((e) => e.status === "live") : empList;
-    if (filter === "全部") return pool;
-    if (filter === "已上岗") return pool.filter((e) => e.status === "live");
-    if (filter === "实习中") return pool.filter((e) => e.status === "evaluating" || e.status === "humanEval");
-    if (filter === "私人定制") return pool.filter((e) => e.role === "私人定制");
-    if (filter === "已退役") return pool.filter((e) => e.status === "pending");
-    return pool;
-  }, [filter, view, empList]);
-
-  const counts = _myUm(() => {
-    const pool = view === "list" ? empList.filter((e) => e.status === "live") : empList;
-    return {
-      all:        pool.length,
-      live:       pool.filter((e) => e.status === "live").length,
-      intern:     pool.filter((e) => e.status === "evaluating" || e.status === "humanEval").length,
-      custom:     pool.filter((e) => e.role === "私人定制").length,
-      pending:    pool.filter((e) => e.status === "pending").length,
-    };
-  }, [view, empList]);
-
-  // 切换视图后，当前页签在新视图下计数为 0 则回退到「全部」
-  _myUe(() => {
-    if (view === "list") {
-      const ok = (
-        (filter === "全部" && counts.all > 0) ||
-        (filter === "已上岗" && counts.live > 0) ||
-        (filter === "实习中" && counts.intern > 0) ||
-        (filter === "私人定制" && counts.custom > 0) ||
-        (filter === "已退役" && counts.pending > 0)
-      );
-      if (!ok) setFilter("全部");
-    }
-  }, [view, filter, counts]);
-
-  // 会话已并入 列表 · 会话 视图（chat.jsx 仅作为 CHAT_OUTPUTS 等工具的承载）
-
-  // IM 配置页
-  if (imCfgId) {
-    const emp = empList.find((e) => e.id === imCfgId);
-    if (emp) {
-      return (
-        <>
-              <div className="page detail-shell">
-            <MyImCfgPage emp={emp} onBack={() => setImCfgId(null)}/>
-          </div>
-        </>
-      );
-    }
-  }
-
-  // 详情页：点击卡片后进入
-  if (detailId) {
-    const emp = empList.find((e) => e.id === detailId);
-    if (emp) {
-      return (
-        <>
-              <div className="page detail-shell">
-            <DetailPage
-              emp={emp}
-              onBack={() => setDetailId(null)}
-              onReEnable={reEnable}
-              onRemove={remove}
-              onOpenImConfig={() => setImCfgId(emp.id)}
-              onStartChat={() => startChat(emp.id)}
-              onGoIM={() => setGoImEmpId(emp.id)}
-              onConfigurePlatform={(platform) => {
-                if (emp.im[platform] === "connected") return; // 已连接 → 看作跳转去 IM，不开弹窗
-                openConfigure(emp.id, platform);
-              }}
-              statusMap={statusMap}
-            />
-          </div>
-          <IMConfigModal
-            open={modalState.open}
-            emp={empList.find((e) => e.id === modalState.empId)}
-            platform={modalState.platform}
-            onClose={closeModal}
-            onConnected={markConnected}
-          />
-        </>
-      );
-    }
-  }
-
-  return (
-    <>
-      <div className="page">
-        <div className="page-head">
-          <div>
-            <h1 className="title">我的数字员工</h1>
-          </div>
-          <button className="copy-btn">新增员工</button>
-        </div>
-
-        <Toolbar filter={filter} setFilter={setFilter} view={view} setView={setView} counts={counts}/>
-
-        {view === "card"
-          ? <CardView list={list} onReEnable={reEnable} onRemove={remove} onOpen={setDetailId} onStartChat={startChat} onGoIM={setGoImEmpId}/>
-          : <ListChatView list={list} requestedActiveId={chatEmpId} onRequestConsumed={() => setChatEmpId(null)} onGoIM={setGoImEmpId}/>}
-      </div>
-      <GoIMModal
-        open={!!goImEmpId}
-        emp={empList.find((e) => e.id === goImEmpId)}
-        onClose={() => setGoImEmpId(null)}
-      />
-    </>
-  );
-}
-
-
 
 Object.assign(window, { TemplatesPage, DeptPage, MyPage });
 /* global window, React */
@@ -3197,7 +1466,8 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
     if (employee.status === "live") {
       if (isManager) {
         actions.push({ label: "重新雇佣", primary: true, go: () => go(`hire/${employee.id}`) });
-        actions.push({ label: "复制分身", go: () => go(`clone/${employee.id}`) });
+        actions.push({ label: "快捷复制", go: () => go(`quick-clone/${employee.id}`) });
+        actions.push({ label: "复制一个给自己", go: () => go(`clone/${employee.id}`) });
       } else {
         actions.push({ label: "创建分身", primary: true, go: () => go(`clone/${employee.id}`) });
       }
@@ -3242,7 +1512,6 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
 function EmployeeDetailPage({ id, role, go, toast }) {
   const employee = window.findEmployeeById(id);
   const [jumpPicker, setJumpPicker] = _useState2(false);
-  const [capOpen, setCapOpen] = _useState2(false);
   if (!employee) return null;
 
   const viewer = window.getViewer(role);
@@ -3265,42 +1534,30 @@ function EmployeeDetailPage({ id, role, go, toast }) {
 
   const actions = buildEmployeeActions(employee, role, go, toast, setJumpPicker);
 
-  const allCaps = [
-    ...(template.capabilities || []).map(c => ({ ok: true, text: c })),
-    ...(template.cants || []).map(c => ({ ok: false, text: c })),
-  ];
-  const PREVIEW = 4;
-  const visible = capOpen || allCaps.length <= PREVIEW ? allCaps : allCaps.slice(0, PREVIEW);
-  const hidden = allCaps.length - PREVIEW;
-
-  const statusNote = employee.status === "live"
-    ? "已上岗实例可以直接进入站内对话，个人资产还可以按需配置 IM 并从平台拉起。"
-    : employee.status === "interning_ai"
-      ? "AI 评估通过后才允许进入人工评估。"
-      : employee.status === "interning_human"
-        ? "人工评估通过后进入发布确认，不再把 IM 配置当成上岗前置条件。"
-        : "失败时通过 Review 选择回退工位，已上传原料会保留。";
-
   return (
     <div className="page">
       <window.Crumb label={`返回 ${employee.type === "department" ? "部门数字员工" : "我的数字员工"}`} onClick={() => go(backTo)} />
 
       <div className="card card-pad detail-hero">
-        <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', width: '100%' }}>
+        <div className="row" style={{ gap: 18, alignItems: "flex-start" }}>
           <window.Avatar initial={employee.initial} tint={employee.tint} size="xl" />
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1 }}>
             <div className="row wrap" style={{ gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>{employee.name}</h2>
+              <h2 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>{employee.name}</h2>
               <window.StatusPill status={employee.status} />
               <window.TypePill type={employee.type} />
             </div>
             <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
               所属部门 {employee.dept || viewer.dept} · Owner {employee.owner} · 最近更新 {employee.updated}
             </div>
-            <p style={{ marginTop: 10, marginBottom: 0, color: "var(--c-body)", lineHeight: 1.65 }}>{employee.desc}</p>
+            <p style={{ marginTop: 14, color: "var(--c-body)", lineHeight: 1.65 }}>{employee.desc}</p>
+
+            <div className="divider" />
+            <h4 className="muted" style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 500 }}>来源关系</h4>
+            <window.Lineage employee={employee} />
           </div>
 
-          <div className="detail-actions" style={{ marginLeft: 'auto', flexShrink: 0 }}>
+          <div className="detail-actions">
             {actions.map(action => (
               <button key={action.label} className={`btn ${action.primary ? "btn-primary" : "btn-ghost"}`} onClick={action.go}>
                 {action.label}
@@ -3313,48 +1570,58 @@ function EmployeeDetailPage({ id, role, go, toast }) {
 
       <div className="spacer-24" />
 
-      <section className="detail-card intro-card">
-        <div className="detail-card-head">
-          <h3>员工介绍</h3>
-        </div>
-
-        {allCaps.length > 0 ? (
-          <ul className={`capability-list ${capOpen ? "" : "clamped"}`}>
-            {visible.map((c, i) => (
-              <li key={i} className={c.ok ? "ok" : "no"}>
-                <span className="cap-icon">
-                  {c.ok
-                    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  }
-                </span>
-                <span>{c.text}</span>
-              </li>
+      <div className="split">
+        <div className="card card-pad">
+          <h3 className="section-h">能力简介</h3>
+          <div className="cap-list">
+            {(template.capabilities || []).slice(0, 4).map(item => (
+              <div key={item} className="cap"><span className="check">✓</span><span>{item}</span></div>
             ))}
-          </ul>
-        ) : null}
+            {(template.cants || []).slice(0, 2).map(item => (
+              <div key={item} className="cap cant"><span className="check">×</span><span>{item}</span></div>
+            ))}
+          </div>
 
-        {allCaps.length > PREVIEW && (
-          <button type="button" className="intro-toggle" onClick={() => setCapOpen(v => !v)} aria-expanded={capOpen}>
-            <span>{capOpen ? "收起" : `全部展开·还有 ${hidden} 项`}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-                 strokeLinecap="round" strokeLinejoin="round"
-                 className={`intro-chev ${capOpen ? "open" : ""}`}>
-              <path d="M6 9l6 6 6-6"/>
-            </svg>
-          </button>
-        )}
-
-        <div className="detail-note compact">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <div>
-            <div className="detail-note-title">状态承接说明</div>
-            <div className="detail-note-text">{statusNote}</div>
+          <div className="divider" />
+          <div className="callout info">
+            详情页只展示业务可读的能力和边界，不暴露底层 Skill 文件。主动作会根据当前实例状态自动切换。
           </div>
         </div>
-      </section>
+
+        <div className="card card-pad">
+          <h3 className="section-h">运行状态</h3>
+          {employee.status === "live" ? (
+            <window.StatStrip items={[
+              { icon: <window.Icon.spark />, value: <span className="tnum">{employee.runs || 0}</span>, label: "累计对话轮次" },
+              { icon: <window.Icon.users />, value: <span className="tnum">{employee.cloned || 0}</span>, label: "被复制" },
+              { icon: <window.Icon.clock />, value: employee.activeAt || "—", label: "最近活跃" },
+              { icon: <window.Icon.shield />, value: <span className="tnum">0</span>, label: "最近错误" },
+              { icon: <window.Icon.bot />, value: "v1.0", label: "实例版本" }
+            ]} />
+          ) : (
+            <div className="callout info">
+              该实例尚未上岗，当前以元数据、流程状态和回退入口为主。{employee.type !== "department" && !isOwner && "你不是 owner，不展示会话历史。"}
+            </div>
+          )}
+
+          <div className="spacer-16" />
+          <div className="callout success">
+            <span style={{ fontSize: 18 }}>🛡️</span>
+            <div>
+              <div style={{ fontWeight: 600, color: "var(--c-near-black)" }}>状态承接说明</div>
+              <div style={{ color: "var(--c-body)", marginTop: 4 }}>
+                {employee.status === "live"
+                  ? "已上岗实例可以直接进入站内对话，个人资产还可以按需配置 IM 并从平台拉起。"
+                  : employee.status === "interning_ai"
+                    ? "AI 评估通过后才允许进入人工评估。"
+                    : employee.status === "interning_human"
+                      ? "人工评估通过后进入发布确认，不再把 IM 配置当成上岗前置条件。"
+                      : "失败时通过 Review 选择回退工位，已上传原料会保留。"}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {employee.type !== "department" && (
         <>
@@ -3583,8 +1850,8 @@ const HIRE_V2_STYLES = String.raw`
 }
 
 .hire-flow-v2 .topbar h1 {
-  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
-  line-height: 1.2;
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
+  line-height: 1.08;
   overflow-wrap: anywhere;
 }
 
@@ -3614,22 +1881,29 @@ const HIRE_V2_STYLES = String.raw`
 .hire-flow-v2 .journey-strip {
   position: relative;
   z-index: 1;
-  margin-bottom: 10px;
-  padding: 4px 0 10px;
+  margin-bottom: 14px;
+  padding: 8px 0 14px;
 }
 
 .hire-flow-v2 .journey-strip-head {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.hire-flow-v2 .journey-strip-head h2 {
+  margin: 4px 0 0;
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
 }
 
 .hire-flow-v2 .journey-summary {
+  max-width: 560px;
   margin: 0;
   color: var(--text-soft);
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   line-height: 1.55;
 }
 
@@ -3731,9 +2005,9 @@ const HIRE_V2_STYLES = String.raw`
   flex-direction: column;
   min-height: 68vh;
   background: #ffffff;
-  border: 1px solid #ececec;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-xl);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
 
@@ -3742,346 +2016,6 @@ const HIRE_V2_STYLES = String.raw`
   height: calc(100vh - 310px);
   min-height: 560px;
   background: #ffffff;
-}
-
-/* ===== Workflow Panel (新版待办面板) ===== */
-.hire-flow-v2 .wf-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.hire-flow-v2 .wf-head {
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-}
-
-.hire-flow-v2 .wf-head-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 6px;
-}
-
-.hire-flow-v2 .wf-stage-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.hire-flow-v2 .wf-pct {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.hire-flow-v2 .wf-progress-bar {
-  height: 4px;
-  background: #ececec;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.hire-flow-v2 .wf-progress-fill {
-  height: 100%;
-  background: var(--good);
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-
-.hire-flow-v2 .wf-note {
-  font-size: 11px;
-  color: var(--caption);
-  margin: 0;
-}
-
-.hire-flow-v2 .wf-sections {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 0 12px;
-}
-
-/* Section */
-.hire-flow-v2 .wf-section {
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.hire-flow-v2 .wf-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 10px 16px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  gap: 8px;
-  text-align: left;
-}
-
-.hire-flow-v2 .wf-section-head:hover {
-  background: var(--surface-soft);
-}
-
-.hire-flow-v2 .wf-section-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.hire-flow-v2 .wf-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--surface-soft);
-  border: 1.5px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-soft);
-  flex-shrink: 0;
-}
-
-.hire-flow-v2 .wf-section-has-data .wf-num {
-  background: #ecfdf5;
-  border-color: #6ee7b7;
-  color: var(--good-deep);
-}
-
-.hire-flow-v2 .wf-section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.hire-flow-v2 .wf-section-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.hire-flow-v2 .wf-status-pill {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-
-.hire-flow-v2 .wf-pill-done {
-  background: #ecfdf5;
-  color: var(--good-deep);
-}
-
-.hire-flow-v2 .wf-pill-pending {
-  background: #fff8ee;
-  color: #b45309;
-}
-
-.hire-flow-v2 .wf-pill-wait {
-  background: var(--surface-soft);
-  color: var(--caption);
-}
-
-.hire-flow-v2 .wf-item-check-pending {
-  background: #f3f4f6;
-  border: 1.5px solid #d1d5db;
-  color: #9ca3af;
-}
-
-.hire-flow-v2 .wf-pill-active {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.hire-flow-v2 .wf-pending-badge {
-  font-size: 11px;
-  color: #c2410c;
-  font-weight: 500;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-.hire-flow-v2 .wf-chevron {
-  font-size: 16px;
-  color: var(--caption);
-  transition: transform 0.2s ease;
-  transform: rotate(90deg);
-  display: inline-block;
-  line-height: 1;
-}
-
-.hire-flow-v2 .wf-chevron.open {
-  transform: rotate(270deg);
-}
-
-.hire-flow-v2 .wf-section-body {
-  padding: 0 16px 10px;
-}
-
-/* Section items */
-.hire-flow-v2 .wf-empty-hint {
-  font-size: 12px;
-  color: var(--caption);
-  line-height: 1.6;
-  margin: 0;
-  padding: 2px 0 4px;
-}
-
-.hire-flow-v2 .wf-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.hire-flow-v2 .wf-item:last-child {
-  border-bottom: none;
-}
-
-.hire-flow-v2 .wf-item-check {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  background: var(--good);
-  color: #fff;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.hire-flow-v2 .wf-item-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.hire-flow-v2 .wf-item-title {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 2px;
-}
-
-.hire-flow-v2 .wf-item-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.hire-flow-v2 .wf-item-tag {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: #e8edff;
-  color: #4a6cf7;
-  font-weight: 500;
-}
-
-.hire-flow-v2 .wf-item-tag-type {
-  background: #f0fdf4;
-  color: var(--good-deep);
-}
-
-.hire-flow-v2 .wf-item-tag-dep {
-  background: #fef3f2;
-  color: #be123c;
-}
-
-.hire-flow-v2 .wf-item-hint {
-  font-size: 11px;
-  color: var(--caption);
-  margin: 0;
-  line-height: 1.5;
-}
-
-.hire-flow-v2 .wf-confirmed {
-  font-size: 11px;
-  color: var(--good-deep);
-  font-weight: 500;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-/* Package section */
-.hire-flow-v2 .wf-pkg-stats {
-  display: flex;
-  gap: 0;
-  margin-bottom: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.hire-flow-v2 .wf-pkg-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 4px;
-  border-right: 1px solid var(--line);
-}
-
-.hire-flow-v2 .wf-pkg-stat:last-child {
-  border-right: none;
-}
-
-.hire-flow-v2 .wf-pkg-num {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.hire-flow-v2 .wf-pkg-label {
-  font-size: 10px;
-  color: var(--caption);
-  margin-top: 2px;
-}
-
-.hire-flow-v2 .wf-pkg-btn {
-  width: 100%;
-  padding: 9px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-  cursor: not-allowed;
-  border: 1px solid var(--line);
-  background: var(--surface-soft);
-  color: var(--caption);
-  margin-bottom: 6px;
-}
-
-.hire-flow-v2 .wf-pkg-btn:disabled {
-  opacity: 1;
-}
-
-.hire-flow-v2 .wf-pkg-btn-ready {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  cursor: pointer;
-}
-
-.hire-flow-v2 .wf-pkg-btn-ready:hover {
-  background: var(--accent-strong);
-}
-
-.hire-flow-v2 .wf-pkg-note {
-  font-size: 10px;
-  color: var(--caption);
-  margin: 0;
-  text-align: center;
 }
 
 .hire-flow-v2 .panel-head {
@@ -4281,17 +2215,6 @@ const HIRE_V2_STYLES = String.raw`
   background: var(--surface);
   color: var(--text);
   border: 1px solid #e5e5e5;
-}
-
-.hire-flow-v2 .skip-ai-btn {
-  color: #4a6cf7;
-  border-color: #c7d2fe;
-  background: #eef2ff;
-}
-
-.hire-flow-v2 .skip-ai-btn:hover {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
 }
 
 .hire-flow-v2 .inline-action:hover,
@@ -5030,22 +2953,19 @@ function buildInitialFlow(template, existing, savedFlow) {
       interactions: 0,
       done: [],
       sources: {},
-      notes: [],
-      todoItems: []
+      notes: []
     },
     skills: {
       adopted: [],
       ignored: [],
       customCount: 0,
       coveredTypes: [],
-      generated: [],
-      todoItems: []
+      generated: []
     },
     integrations: {
       configs: {},
       done: [],
-      failed: [],
-      todoItems: []
+      failed: []
     },
     package: {
       generated: false,
@@ -5064,8 +2984,7 @@ function buildInitialFlow(template, existing, savedFlow) {
     docs: {
       ...base.docs,
       ...(savedFlow.docs || {}),
-      done: Array.isArray(savedFlow.docs && savedFlow.docs.done) ? savedFlow.docs.done : [],
-      todoItems: Array.isArray(savedFlow.docs && savedFlow.docs.todoItems) ? savedFlow.docs.todoItems : []
+      done: Array.isArray(savedFlow.docs && savedFlow.docs.done) ? savedFlow.docs.done : []
     },
     skills: {
       ...base.skills,
@@ -5073,14 +2992,12 @@ function buildInitialFlow(template, existing, savedFlow) {
       adopted: Array.isArray(savedFlow.skills && savedFlow.skills.adopted) ? savedFlow.skills.adopted : [],
       ignored: Array.isArray(savedFlow.skills && savedFlow.skills.ignored) ? savedFlow.skills.ignored : [],
       coveredTypes: Array.isArray(savedFlow.skills && savedFlow.skills.coveredTypes) ? savedFlow.skills.coveredTypes : [],
-      generated: Array.isArray(savedFlow.skills && savedFlow.skills.generated) ? savedFlow.skills.generated : [],
-      todoItems: Array.isArray(savedFlow.skills && savedFlow.skills.todoItems) ? savedFlow.skills.todoItems : []
+      generated: Array.isArray(savedFlow.skills && savedFlow.skills.generated) ? savedFlow.skills.generated : []
     },
     integrations: {
       ...base.integrations,
       ...(savedFlow.integrations || {}),
-      done: Array.isArray(savedFlow.integrations && savedFlow.integrations.done) ? savedFlow.integrations.done : [],
-      todoItems: Array.isArray(savedFlow.integrations && savedFlow.integrations.todoItems) ? savedFlow.integrations.todoItems : []
+      done: Array.isArray(savedFlow.integrations && savedFlow.integrations.done) ? savedFlow.integrations.done : []
     },
     package: {
       ...base.package,
@@ -5548,7 +3465,6 @@ function HirePage({ id, tpl, go, toast }) {
   const [editingSkillId, setEditingSkillId] = _useStateH("");
   const [skillForm, setSkillForm] = _useStateH({ name: "", description: "", trigger: "" });
   const [dropActive, setDropActive] = _useStateH(false);
-  const [wfExpanded, setWfExpanded] = _useStateH({ docs: true, skills: true, integrations: true, package: true });
 
   const businessFileInputRef = _useRefH(null);
   const skillFileInputRef = _useRefH(null);
@@ -5592,20 +3508,14 @@ function HirePage({ id, tpl, go, toast }) {
   }
 
   function areDocsComplete(targetFlow = flowRef.current) {
-    const items = (targetFlow.docs && targetFlow.docs.todoItems) || [];
-    if (items.length > 0) return items.some(i => i.status === 'confirmed');
     return hasUploadedBusinessFile(targetFlow) || targetFlow.docs.done.length >= DOC_REQUIREMENTS.length;
   }
 
   function areSkillsReady(targetFlow = flowRef.current) {
-    const items = (targetFlow.skills && targetFlow.skills.todoItems) || [];
-    if (items.length > 0) return items.some(i => i.status === 'confirmed');
     return targetFlow.skills.adopted.length >= 1;
   }
 
   function areIntegrationsReady(targetFlow = flowRef.current) {
-    const items = (targetFlow.integrations && targetFlow.integrations.todoItems) || [];
-    if (items.length > 0) return items.some(i => i.status === 'confirmed');
     return targetFlow.integrations.done.length >= INTEGRATION_DEFINITIONS.length;
   }
 
@@ -5754,15 +3664,6 @@ function HirePage({ id, tpl, go, toast }) {
       normalizeUploadedDocCoverage(files, files.flatMap(file => detectDocCoverage(file.name)))
     ));
 
-    const newTodos = files.map(file => ({
-      id: `doc_${file.name}`,
-      label: file.name.replace(/\.[^.]+$/, ''),
-      type: file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : '文档',
-      tags: recognized.length ? recognized.map(findDocLabel) : ['业务资料'],
-      status: 'confirmed',
-      hint: '已识别并归档，可被技能检索引用。'
-    }));
-
     setFlow(prev => {
       const doneSet = new Set(prev.docs.done);
       recognized.forEach(item => doneSet.add(item));
@@ -5791,11 +3692,7 @@ function HirePage({ id, tpl, go, toast }) {
           ...prev.docs,
           interactions: prev.docs.interactions + 1,
           done: nextDone,
-          sources: nextSources,
-          todoItems: [
-            ...prev.docs.todoItems,
-            ...newTodos.filter(t => !prev.docs.todoItems.some(e => e.id === t.id))
-          ]
+          sources: nextSources
         }
       };
     });
@@ -5808,17 +3705,6 @@ function HirePage({ id, tpl, go, toast }) {
   function processBusinessText(text) {
     const recognized = Array.from(new Set(detectDocCoverage(text)));
     const projectedDone = Array.from(new Set([...flowRef.current.docs.done, ...recognized]));
-
-    const newTodos = recognized.length
-      ? recognized.map(docId => ({
-          id: `doc_${docId}`,
-          label: findDocLabel(docId),
-          type: '文字说明',
-          tags: [findDocLabel(docId)],
-          status: 'confirmed',
-          hint: '通过对话描述归档，已加入知识体系。'
-        }))
-      : [{ id: `doc_note_${Date.now()}`, label: text.slice(0, 20) + '…', type: '文字说明', tags: ['补充说明'], status: 'confirmed', hint: '已记录为业务补充说明。' }];
 
     setFlow(prev => {
       const doneSet = new Set(prev.docs.done);
@@ -5841,11 +3727,7 @@ function HirePage({ id, tpl, go, toast }) {
           ...prev.docs,
           interactions: prev.docs.interactions + 1,
           done: nextDone,
-          notes: [...prev.docs.notes, text],
-          todoItems: [
-            ...prev.docs.todoItems,
-            ...newTodos.filter(t => !prev.docs.todoItems.some(e => e.id === t.id))
-          ]
+          notes: [...prev.docs.notes, text]
         }
       };
     });
@@ -5881,27 +3763,11 @@ function HirePage({ id, tpl, go, toast }) {
           ]
         : prev.messages;
 
-      const newSkillTodos = available.map(item => ({
-        id: item.id,
-        label: item.name,
-        type: item.type || '智能技能',
-        status: 'pending',
-        hint: item.description || '',
-        dep: item.dependency || ''
-      }));
-
       return {
         ...prev,
         currentPhase: Math.max(prev.currentPhase, 4),
         todoRevealed: true,
-        messages,
-        skills: {
-          ...prev.skills,
-          todoItems: [
-            ...prev.skills.todoItems,
-            ...newSkillTodos.filter(t => !prev.skills.todoItems.some(e => e.id === t.id))
-          ]
-        }
+        messages
       };
     });
   }
@@ -5937,10 +3803,7 @@ function HirePage({ id, tpl, go, toast }) {
         skills: {
           ...prev.skills,
           adopted: [...prev.skills.adopted, merged],
-          coveredTypes: nextCoveredTypes,
-          todoItems: prev.skills.todoItems.some(t => t.id === skillId)
-            ? prev.skills.todoItems.map(t => t.id === skillId ? { ...t, status: 'confirmed' } : t)
-            : [...prev.skills.todoItems, { id: skillId, label: merged.name, type: merged.type || '智能技能', status: 'confirmed', hint: merged.description || '', dep: merged.dependency || '' }]
+          coveredTypes: nextCoveredTypes
         }
       };
     });
@@ -5953,8 +3816,7 @@ function HirePage({ id, tpl, go, toast }) {
       ...prev,
       skills: {
         ...prev.skills,
-        ignored: prev.skills.ignored.includes(skillId) ? prev.skills.ignored : [...prev.skills.ignored, skillId],
-        todoItems: prev.skills.todoItems.map(t => t.id === skillId ? { ...t, status: 'ignored' } : t)
+        ignored: prev.skills.ignored.includes(skillId) ? prev.skills.ignored : [...prev.skills.ignored, skillId]
       },
       messages: [
         ...prev.messages,
@@ -6002,9 +3864,6 @@ function HirePage({ id, tpl, go, toast }) {
     }
 
     const generatedSkills = files.map(buildSkillFromFile);
-    const newSkillTodos = generatedSkills.map(s => ({
-      id: s.id, label: s.name, type: s.type || '自定义技能', status: 'confirmed', hint: s.description || '', dep: ''
-    }));
     setFlow(prev => ({
       ...prev,
       currentPhase: 5,
@@ -6021,11 +3880,7 @@ function HirePage({ id, tpl, go, toast }) {
         ...prev.skills,
         customCount: prev.skills.customCount + generatedSkills.length,
         adopted: [...prev.skills.adopted, ...generatedSkills],
-        coveredTypes: [...prev.skills.coveredTypes, ...generatedSkills.map(s => s.type)],
-        todoItems: [
-          ...prev.skills.todoItems,
-          ...newSkillTodos.filter(t => !prev.skills.todoItems.some(e => e.id === t.id))
-        ]
+        coveredTypes: [...prev.skills.coveredTypes, ...generatedSkills.map(s => s.type)]
       }
     }));
     toast("Skill 文件已处理");
@@ -6049,19 +3904,12 @@ function HirePage({ id, tpl, go, toast }) {
         ...prev.skills,
         customCount: prev.skills.customCount + 1,
         adopted: [generated, ...prev.skills.adopted],
-        coveredTypes: [generated.type, ...prev.skills.coveredTypes],
-        todoItems: prev.skills.todoItems.some(t => t.id === generated.id)
-          ? prev.skills.todoItems
-          : [...prev.skills.todoItems, { id: generated.id, label: generated.name, type: generated.type || '自定义技能', status: 'confirmed', hint: generated.description || '', dep: '' }]
+        coveredTypes: [generated.type, ...prev.skills.coveredTypes]
       }
     }));
   }
 
   function suggestIntegrations(forceMessage) {
-    const newSysTodos = INTEGRATION_DEFINITIONS.map(def => ({
-      id: def.id, label: def.name, type: 'REST API', status: 'pending', hint: def.purpose
-    }));
-
     setFlow(prev => ({
       ...prev,
       currentPhase: Math.max(prev.currentPhase, 5),
@@ -6080,14 +3928,7 @@ function HirePage({ id, tpl, go, toast }) {
               }
             })
           ]
-        : prev.messages,
-      integrations: {
-        ...prev.integrations,
-        todoItems: [
-          ...prev.integrations.todoItems,
-          ...newSysTodos.filter(t => !prev.integrations.todoItems.some(e => e.id === t.id))
-        ]
-      }
+        : prev.messages
     }));
   }
 
@@ -6175,10 +4016,7 @@ function HirePage({ id, tpl, go, toast }) {
             [activeSystemId]: finalConfig
           },
           done: Array.from(doneSet),
-          failed: prev.integrations.failed.filter(item => item !== activeSystemId),
-          todoItems: prev.integrations.todoItems.some(t => t.id === activeSystemId)
-            ? prev.integrations.todoItems.map(t => t.id === activeSystemId ? { ...t, status: 'confirmed' } : t)
-            : [...prev.integrations.todoItems, { id: activeSystemId, label: system.name, type: 'REST API', status: 'confirmed', hint: system.purpose }]
+          failed: prev.integrations.failed.filter(item => item !== activeSystemId)
         }
       };
     });
@@ -6250,17 +4088,7 @@ function HirePage({ id, tpl, go, toast }) {
           ...prev.integrations.configs,
           ...configs
         },
-        done: Array.from(nextDone),
-        todoItems: (() => {
-          let items = [...prev.integrations.todoItems];
-          results.forEach(r => {
-            const def = INTEGRATION_DEFINITIONS.find(d => d.id === r.systemId);
-            const idx = items.findIndex(t => t.id === r.systemId);
-            if (idx >= 0) items[idx] = { ...items[idx], status: 'confirmed' };
-            else items.push({ id: r.systemId, label: def ? def.name : r.systemId, type: 'REST API', status: 'confirmed', hint: def ? def.purpose : '' });
-          });
-          return items;
-        })()
+        done: Array.from(nextDone)
       }
     }));
 
@@ -6269,21 +4097,15 @@ function HirePage({ id, tpl, go, toast }) {
 
   function generatePackage() {
     if (!areDocsComplete()) {
-      const docItems = (flowRef.current.docs && flowRef.current.docs.todoItems) || [];
-      if (docItems.some(i => i.status === 'pending')) toast("还有资料待办未确认，请先处理");
-      else toast("请先补齐业务资料");
+      toast("请先补齐业务资料");
       return;
     }
     if (!areSkillsReady()) {
-      const skillItems = (flowRef.current.skills && flowRef.current.skills.todoItems) || [];
-      if (skillItems.some(i => i.status === 'pending')) toast("还有技能待办未确认，请先处理");
-      else toast("请先补齐查询、处理、升级三类技能");
+      toast("请先补齐查询、处理、升级三类技能");
       return;
     }
     if (!areIntegrationsReady()) {
-      const sysItems = (flowRef.current.integrations && flowRef.current.integrations.todoItems) || [];
-      if (sysItems.some(i => i.status === 'pending')) toast("还有系统待办未确认，请先处理");
-      else toast("请先完成全部系统连接");
+      toast("请先完成全部系统连接");
       return;
     }
     if (flowRef.current.package.generated) {
@@ -6422,23 +4244,6 @@ function HirePage({ id, tpl, go, toast }) {
 
     clearFlowCache(cacheKey);
     toast("雇佣阶段完成，进入 AI 评估");
-    go(`eval-ai/${target.id}`);
-  }
-
-  function skipToAIEval() {
-    let target = existing;
-    if (!target) {
-      target = createDepartmentEmployeeForTemplate();
-    } else {
-      window.updateEmployee(target.id, {
-        status: "interning_ai",
-        evalProgress: 0,
-        hireProgress: 6,
-        updated: "刚刚"
-      });
-    }
-    clearFlowCache(cacheKey);
-    toast("已跳过待办事项，直接进入 AI 评估");
     go(`eval-ai/${target.id}`);
   }
 
@@ -6589,18 +4394,22 @@ function HirePage({ id, tpl, go, toast }) {
         <div className="app-shell">
           <header className="topbar">
             <div>
+              <p className="eyebrow">Future Colleague Onboarding</p>
               <h1>数字员工雇佣流程</h1>
             </div>
             <div className="topbar-actions">
               <button className="ghost-btn" onClick={saveFlowDraft}>保存</button>
               <button className="ghost-btn" onClick={resetFlow}>重置流程</button>
-              <button className="ghost-btn skip-ai-btn" onClick={skipToAIEval}>直接进入 AI 流程</button>
               <button className="primary-btn" onClick={flow.package.generated ? enterEvaluation : guideCurrentPhase}>{resumeLabel}</button>
             </div>
           </header>
 
           <section className="journey-strip">
             <div className="journey-strip-head">
+              <div>
+                <p className="eyebrow">Hiring Journey</p>
+                <h2>流程步骤</h2>
+              </div>
               <p className="journey-summary">
                 {existing
                   ? `当前正在处理「${existing.name}」的雇佣环节。`
@@ -6618,7 +4427,7 @@ function HirePage({ id, tpl, go, toast }) {
 
                 return (
                   <button key={step.id} type="button" className={`step-pill is-${status}`} onClick={() => jumpToPhase(step.phase)}>
-                    <span className="step-index">{status === 'done' ? '✓' : index + 1}</span>
+                    <span className="step-index">{index + 1}</span>
                     <span className="step-copy">
                       <strong>{step.label}</strong>
                       <small>{step.short}</small>
@@ -6703,221 +4512,79 @@ function HirePage({ id, tpl, go, toast }) {
               </div>
             </section>
 
-            <aside className="todo-panel panel wf-panel">
-              {(() => {
-                const docEntries = (flow.docs.todoItems || []).filter(i => i.status !== 'ignored');
-                const skillEntries = (flow.skills.todoItems || []).filter(i => i.status !== 'ignored');
-                const sysEntries = (flow.integrations.todoItems || []).filter(i => i.status !== 'ignored');
+            <aside className="todo-panel panel">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Progress Ledger</p>
+                  <h2>待办事项</h2>
+                </div>
+                <div className="score-card">
+                  <span>{completionRatio()}%</span>
+                  <small>完成度</small>
+                </div>
+              </div>
 
-                const docConfirmed = docEntries.filter(i => i.status === 'confirmed').length;
-                const skillConfirmed = skillEntries.filter(i => i.status === 'confirmed').length;
-                const sysConfirmed = sysEntries.filter(i => i.status === 'confirmed').length;
-                const docPending = docEntries.some(i => i.status === 'pending');
-                const skillPending = skillEntries.some(i => i.status === 'pending');
-                const sysPending = sysEntries.some(i => i.status === 'pending');
-
-                const docsDone = docConfirmed > 0 && !docPending;
-                const docsActive = docConfirmed > 0 && docPending;
-                const docsHasAny = docEntries.length > 0;
-                const skillsDone = skillConfirmed > 0 && !skillPending;
-                const skillsActive = skillConfirmed > 0 && skillPending;
-                const skillsHasAny = skillEntries.length > 0;
-                const sysDone = sysConfirmed > 0 && !sysPending;
-                const sysActive = sysConfirmed > 0 && sysPending;
-                const sysHasAny = sysEntries.length > 0;
-
-                const ratio = (() => {
-                  const stages = [
-                    (flow.docs.todoItems || []).some(i => i.status === 'confirmed') ? 1 : 0,
-                    (flow.skills.todoItems || []).some(i => i.status === 'confirmed') ? 1 : 0,
-                    (flow.integrations.todoItems || []).some(i => i.status === 'confirmed') ? 1 : 0,
-                    flow.package.generated ? 1 : 0
-                  ];
-                  return Math.round((stages.reduce((s, v) => s + v, 0) / stages.length) * 100);
-                })();
-
-                const allStagesDone = (flow.docs.todoItems || []).some(i => i.status === 'confirmed')
-                  && (flow.skills.todoItems || []).some(i => i.status === 'confirmed')
-                  && (flow.integrations.todoItems || []).some(i => i.status === 'confirmed');
-                const anyPending = docPending || skillPending || sysPending;
-
-                function toggleSection(key) {
-                  setWfExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-                }
-
-                function WfSection({ num, sectionKey, label, statusLabel, statusCls, items, emptyHint, renderItems, alwaysExpand }) {
-                  const open = wfExpanded[sectionKey];
+              <div className="todo-groups">
+                {todoItems().map(item => {
+                  const status = stepStatus(item);
                   return (
-                    <div className={`wf-section ${items.length > 0 ? 'wf-section-has-data' : 'wf-section-empty'}`}>
-                      <button className="wf-section-head" onClick={() => toggleSection(sectionKey)}>
-                        <div className="wf-section-left">
-                          <span className="wf-num">{num}</span>
-                          <span className="wf-section-title">{label}</span>
+                    <div key={item.id} type="button" className={`todo-item ${flow.currentPhase >= item.phase ? "active" : ""}`} onClick={() => jumpToPhase(item.phase)}>
+                      <div className="todo-head">
+                        <div>
+                          <h3>{item.title}</h3>
+                          <p>{item.description}</p>
                         </div>
-                        <div className="wf-section-right">
-                          <span className={`wf-status-pill ${statusCls}`}>{statusLabel}</span>
-                          <span className={`wf-chevron ${open ? 'open' : ''}`}>›</span>
+                        <div className={`todo-status ${status.className}`}>
+                          <span className="status-icon">{status.icon}</span>
+                          <span>{status.label}</span>
                         </div>
-                      </button>
-                      {open && (
-                        <div className="wf-section-body">
-                          {items.length > 0 ? renderItems() : (
-                            <p className="wf-empty-hint">{emptyHint}</p>
-                          )}
+                      </div>
+                      <div className="todo-progress"><span style={{ width: `${Math.round(item.progress * 100)}%` }}></span></div>
+
+                      {item.subtasks.length > 0 && (
+                        <div className="todo-subtasks">
+                          {item.subtasks.map(label => {
+                            const sub = subtaskStatus(item.id, label);
+                            const system = item.id === "integrations" ? INTEGRATION_DEFINITIONS.find(entry => entry.name === label) : null;
+                            const config = system && flow.integrations.configs[system.id];
+                            return system ? (
+                              <button key={label} type="button" className={`subtask-chip subtask-chip-action ${sub.className}`} onClick={event => {
+                                event.stopPropagation();
+                                openSystemDrawer(system.id);
+                              }}>
+                                <div className="subtask-label-group">
+                                  <span>{label}</span>
+                                  {config && flow.integrations.done.includes(system.id) && <small className="subtask-hint">{renderIntegrationSummary(config)}</small>}
+                                </div>
+                                <strong>{sub.icon} {sub.label}</strong>
+                              </button>
+                            ) : (
+                              <div key={label} className={`subtask-chip ${sub.className}`}>
+                                <span>{label}</span>
+                                <strong>{sub.icon} {sub.label}</strong>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {item.id === "package" && flow.package.meta && (
+                        <div className="todo-package-preview">
+                          <div className="todo-package-badge">
+                            <span className="todo-package-icon">📦</span>
+                            <span className="todo-package-name">{flow.package.meta.name}</span>
+                            <span className="todo-package-status">已生成</span>
+                          </div>
                         </div>
                       )}
                     </div>
                   );
-                }
+                })}
 
-                return (
-                  <>
-                    <div className="wf-head">
-                      <div className="wf-head-top">
-                        <span className="wf-stage-label">工作流 · 4 阶段</span>
-                        <span className="wf-pct tnum">{ratio}%</span>
-                      </div>
-                      <div className="wf-progress-bar">
-                        <div className="wf-progress-fill" style={{ width: `${ratio}%` }} />
-                      </div>
-                      <p className="wf-note">前 3 个阶段累计 100% 确认后，可生成实例包</p>
-                    </div>
-
-                    <div className="wf-sections">
-                      <WfSection
-                        num="①"
-                        sectionKey="docs"
-                        label="上传资料"
-                        statusLabel={docsDone ? `已完成 ${docConfirmed}/${docEntries.length}` : (docsActive ? `进行中 ${docConfirmed}/${docEntries.length}` : '待生成')}
-                        statusCls={docsDone ? 'wf-pill-done' : (docsActive ? 'wf-pill-active' : 'wf-pill-pending')}
-                        items={docEntries}
-                        emptyHint="在左侧描述业务场景或资料需求，我会自动登记..."
-                        renderItems={() => docEntries.map((item, i) => (
-                          <div key={item.id || i} className="wf-item">
-                            <span className={`wf-item-check${item.status === 'pending' ? ' wf-item-check-pending' : ''}`}>{item.status === 'pending' ? '○' : '✓'}</span>
-                            <div className="wf-item-body">
-                              <div className="wf-item-title">
-                                <span className="wf-item-name">{item.label}</span>
-                                {item.type && <span className="wf-item-tag">{item.type}</span>}
-                                {item.tags && item.tags.length > 0 && <span className="wf-item-tag wf-item-tag-type">· {item.tags.join(' · ')}</span>}
-                              </div>
-                              <p className="wf-item-hint">{item.hint}</p>
-                            </div>
-                            {item.status === 'confirmed'
-                              ? <span className="wf-confirmed">已确认</span>
-                              : <span className="wf-pending-badge">待确认</span>}
-                          </div>
-                        ))}
-                      />
-
-                      <WfSection
-                        num="②"
-                        sectionKey="skills"
-                        label="补齐技能"
-                        statusLabel={skillsDone ? `已完成 ${skillConfirmed}/${skillEntries.length}` : (skillsActive ? `进行中 ${skillConfirmed}/${skillEntries.length}` : (docsHasAny ? '待生成' : '等待前序'))}
-                        statusCls={skillsDone ? 'wf-pill-done' : (skillsActive ? 'wf-pill-active' : 'wf-pill-wait')}
-                        items={skillEntries}
-                        emptyHint={docsHasAny ? '基于①阶段已确认资料自动推断；用户在会话中补充技能需求时也可新增' : '等待前序阶段确认后自动生成...'}
-                        renderItems={() => skillEntries.map((item, i) => (
-                          <div key={item.id || i} className="wf-item">
-                            <span className={`wf-item-check${item.status === 'pending' ? ' wf-item-check-pending' : ''}`}>{item.status === 'pending' ? '○' : '✓'}</span>
-                            <div className="wf-item-body">
-                              <div className="wf-item-title">
-                                <span className="wf-item-name">{item.label}</span>
-                                <span className="wf-item-tag">{item.type}</span>
-                                {item.dep && <span className="wf-item-tag wf-item-tag-dep">· {item.dep}</span>}
-                              </div>
-                              <p className="wf-item-hint">{item.hint}</p>
-                            </div>
-                            {item.status === 'confirmed'
-                              ? <span className="wf-confirmed">已确认</span>
-                              : <span className="wf-pending-badge">待确认</span>}
-                          </div>
-                        ))}
-                      />
-
-                      <WfSection
-                        num="③"
-                        sectionKey="integrations"
-                        label="配置外部系统"
-                        statusLabel={sysDone ? `已完成 ${sysConfirmed}/${sysEntries.length}` : (sysActive ? `进行中 ${sysConfirmed}/${sysEntries.length}` : (skillsHasAny ? '待生成' : '等待前序'))}
-                        statusCls={sysDone ? 'wf-pill-done' : (sysActive ? 'wf-pill-active' : 'wf-pill-wait')}
-                        items={sysEntries}
-                        emptyHint={skillsHasAny ? '会话中提及外部系统、接口后集成需求时触发，每个系统对应一条待办。' : '等待前序阶段确认后自动生成...'}
-                        renderItems={() => sysEntries.map((item, i) => (
-                          <div key={item.id || i} className="wf-item">
-                            <span className={`wf-item-check${item.status === 'pending' ? ' wf-item-check-pending' : ''}`}>{item.status === 'pending' ? '○' : '✓'}</span>
-                            <div className="wf-item-body">
-                              <div className="wf-item-title">
-                                <span className="wf-item-name">{item.label}</span>
-                                <span className="wf-item-tag">{item.type || 'REST API'}</span>
-                              </div>
-                              <p className="wf-item-hint">{item.hint}</p>
-                            </div>
-                            {item.status === 'confirmed'
-                              ? <span className="wf-confirmed">已确认</span>
-                              : <span className="wf-pending-badge">待确认</span>}
-                          </div>
-                        ))}
-                      />
-
-                      {/* 生成实例包 */}
-                      <div className={`wf-section ${flow.package.generated ? 'wf-section-has-data' : 'wf-section-empty'}`}>
-                        <button className="wf-section-head" onClick={() => toggleSection('package')}>
-                          <div className="wf-section-left">
-                            <span className="wf-num">④</span>
-                            <span className="wf-section-title">生成实例包</span>
-                          </div>
-                          <div className="wf-section-right">
-                            <span className={`wf-status-pill ${flow.package.generated ? 'wf-pill-done' : 'wf-pill-wait'}`}>
-                              {flow.package.generated ? '已生成' : '等待前序'}
-                            </span>
-                            <span className={`wf-chevron ${wfExpanded.package ? 'open' : ''}`}>›</span>
-                          </div>
-                        </button>
-                        {wfExpanded.package && (
-                          <div className="wf-section-body">
-                            <div className="wf-pkg-stats">
-                              <div className="wf-pkg-stat">
-                                <span className="wf-pkg-num tnum">{docConfirmed}/{docEntries.length || 0}</span>
-                                <span className="wf-pkg-label">① 资料</span>
-                              </div>
-                              <div className="wf-pkg-stat">
-                                <span className="wf-pkg-num tnum">{skillConfirmed}/{skillEntries.length || 0}</span>
-                                <span className="wf-pkg-label">② 技能</span>
-                              </div>
-                              <div className="wf-pkg-stat">
-                                <span className="wf-pkg-num tnum">{sysConfirmed}/{sysEntries.length || 0}</span>
-                                <span className="wf-pkg-label">③ 外部系统</span>
-                              </div>
-                            </div>
-                            {!flow.package.generated && (
-                              <>
-                                <button
-                                  className="wf-pkg-btn"
-                                  disabled={!allStagesDone || anyPending}
-                                  onClick={() => {
-                                    if (!allStagesDone || anyPending) return;
-                                    enterEvaluation();
-                                  }}
-                                >
-                                  {allStagesDone && !anyPending ? '进入 AI 评估 →' : '🔒 完成前序待办可用'}
-                                </button>
-                                <p className="wf-pkg-note">✦ 硬性校验：3 个阶段有待办须 100% 确认</p>
-                              </>
-                            )}
-                            {flow.package.generated && (
-                              <button className="wf-pkg-btn wf-pkg-btn-ready" onClick={enterEvaluation}>
-                                进入 AI 评估 →
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
+                {!flow.messages.length && (
+                  <p className="empty-tip">雇佣引导会从左侧会话开始。点击"开始第一步"后，右侧待办会跟随推进。</p>
+                )}
+              </div>
             </aside>
           </main>
         </div>
@@ -7608,30 +5275,31 @@ function EvalProgressBar({ currentIteration, maxIterations, currentStep }) {
 
   return (
     <div className="eval-progress-bar">
-      <div className="eval-progress-iter">
-        <span className="eval-progress-iter-label">第 {currentIteration}/{maxIterations} 评训轮次</span>
-        {currentIteration > 1 && (
-          <span className="eval-progress-iter-done">已完成 {currentIteration - 1} 轮 ✓</span>
-        )}
+      <div className="eval-progress-head">
+        <div className="eval-progress-iter">
+          <span className="eval-progress-iter-label">第 {currentIteration}/{maxIterations} 评训轮次</span>
+          {currentIteration > 1 && (
+            <span className="eval-progress-iter-done">已完成 {currentIteration - 1} 轮 ✓</span>
+          )}
+        </div>
+        <span className="eval-progress-percent">总进度 {Math.round((currentIteration / maxIterations) * 100)}%</span>
       </div>
-      <div className="eval-stepper">
+      <div className="eval-progress-track">
+        <div className="eval-progress-fill" style={{ width: `${stepProgress}%` }} />
+      </div>
+      <div className="eval-progress-steps">
         {EVAL_STEPS.map((label, i) => (
-          <React.Fragment key={i}>
-            <div className={`eval-stepper-step ${i < currentStep ? 'done' : i === currentStep ? 'active' : 'pending'}`}>
-              <div className="eval-stepper-dot">
-                {i < currentStep ? '✓' : i === currentStep
-                  ? <span className="eval-progress-step-spinner">⟳</span>
-                  : i + 1}
-              </div>
-              <span className="eval-stepper-label">
-                {label}{(i === 0 || i === 1) && currentStep > i && <span className="eval-stepper-auto"> ⚡</span>}
-              </span>
+          <div key={i} className="eval-progress-step">
+            <div className={`eval-progress-step-pill ${i < currentStep ? 'done' : i === currentStep ? 'active' : 'pending'}`}>
+              {i < currentStep && <span className="eval-progress-step-check">✓</span>}
+              {i === currentStep && <span className="eval-progress-step-spinner">⟳</span>}
+              {label}
+              {(i === 0 || i === 1) && currentStep > i && <span className="eval-progress-step-auto">⚡</span>}
             </div>
-            {i < EVAL_STEPS.length - 1 && <div className={`eval-stepper-line ${i < currentStep ? 'done' : ''}`} />}
-          </React.Fragment>
+            {i < EVAL_STEPS.length - 1 && <span className="eval-progress-step-arrow">→</span>}
+          </div>
         ))}
       </div>
-      <span className="eval-progress-percent">总进度 {Math.round((currentIteration / maxIterations) * 100)}%</span>
     </div>
   );
 }
@@ -7641,63 +5309,50 @@ function EvalScenariosPanel() {
   const ontologyReady = EVAL_ONTOLOGY_STATUS.isReady;
   const scenariosReady = EVAL_SCENARIOS.every(s => s.status === 'ready');
   const allReady = ontologyReady && scenariosReady;
-  const [open, setOpen] = _useStateE(false);
 
   return (
     <div className="eval-scenarios-panel">
-      <div className="eval-scenarios-ontology" style={{ marginBottom: open ? undefined : 0, paddingBottom: open ? undefined : 0, borderBottom: open ? undefined : 'none' }}>
-        <div className="eval-scenarios-ontology-title" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setOpen(v => !v)}>
-          <span style={{ flex: 1 }}>评估大纲</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-               style={{ width: 13, height: 13, color: 'var(--ink-4)', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.18s' }}>
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </div>
-        {open && (
-          <div className="eval-scenarios-ontology-items">
-            <div className="eval-scenarios-ontology-item">
-              <span className={`eval-scenarios-dot ${ontologyReady ? 'green' : 'amber'}`} />
-              <span>评估维度</span>
-              <span className="eval-scenarios-count">{EVAL_ONTOLOGY_STATUS.dimensions.length} 个</span>
-              {ontologyReady && <span className="eval-scenarios-check">✓</span>}
-            </div>
-            <div className="eval-scenarios-ontology-item">
-              <span className={`eval-scenarios-dot ${ontologyReady ? 'green' : 'amber'}`} />
-              <span>一票否决项</span>
-              <span className="eval-scenarios-count">{EVAL_ONTOLOGY_STATUS.criticalRequirements.length} 个</span>
-              {ontologyReady && <span className="eval-scenarios-check">✓</span>}
-            </div>
+      <div className="eval-scenarios-ontology">
+        <div className="eval-scenarios-ontology-title">评估大纲</div>
+        <div className="eval-scenarios-ontology-items">
+          <div className="eval-scenarios-ontology-item">
+            <span className={`eval-scenarios-dot ${ontologyReady ? 'green' : 'amber'}`} />
+            <span>评估维度</span>
+            <span className="eval-scenarios-count">{EVAL_ONTOLOGY_STATUS.dimensions.length} 个</span>
+            {ontologyReady && <span className="eval-scenarios-check">✓</span>}
           </div>
-        )}
+          <div className="eval-scenarios-ontology-item">
+            <span className={`eval-scenarios-dot ${ontologyReady ? 'green' : 'amber'}`} />
+            <span>一票否决项</span>
+            <span className="eval-scenarios-count">{EVAL_ONTOLOGY_STATUS.criticalRequirements.length} 个</span>
+            {ontologyReady && <span className="eval-scenarios-check">✓</span>}
+          </div>
+        </div>
       </div>
 
-      {open && (
-        <>
-          <div className="eval-scenarios-section">
-            <div className="eval-scenarios-section-title">测试场景 ({EVAL_SCENARIOS.length} 个)</div>
-            <div className="eval-scenarios-list">
-              {EVAL_SCENARIOS.map(s => (
-                <div key={s.id} className="eval-scenarios-item">
-                  <span className={`eval-scenarios-dot ${s.status === 'ready' ? 'green' : 'amber'}`} />
-                  <span className="eval-scenarios-name">{s.name}</span>
-                  {s.status === 'ready' ? (
-                    <span className="eval-scenarios-ready">✓ {s.testCaseCount} 用例</span>
-                  ) : (
-                    <span className="eval-scenarios-warn">缺失</span>
-                  )}
-                </div>
-              ))}
+      <div className="eval-scenarios-section">
+        <div className="eval-scenarios-section-title">测试场景 ({EVAL_SCENARIOS.length} 个)</div>
+        <div className="eval-scenarios-list">
+          {EVAL_SCENARIOS.map(s => (
+            <div key={s.id} className="eval-scenarios-item">
+              <span className={`eval-scenarios-dot ${s.status === 'ready' ? 'green' : 'amber'}`} />
+              <span className="eval-scenarios-name">{s.name}</span>
+              {s.status === 'ready' ? (
+                <span className="eval-scenarios-ready">✓ {s.testCaseCount} 用例</span>
+              ) : (
+                <span className="eval-scenarios-warn">缺失</span>
+              )}
             </div>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <div className={`eval-scenarios-status ${allReady ? 'ready' : 'warn'}`}>
-            <span className={`eval-scenarios-status-icon ${allReady ? 'ready' : 'warn'}`}>
-              {allReady ? '✓' : '⚠'}
-            </span>
-            <span>{allReady ? '本体和用例均已就绪，可开始评估' : '本体或用例缺失，需补充后才能继续'}</span>
-          </div>
-        </>
-      )}
+      <div className={`eval-scenarios-status ${allReady ? 'ready' : 'warn'}`}>
+        <span className={`eval-scenarios-status-icon ${allReady ? 'ready' : 'warn'}`}>
+          {allReady ? '✓' : '⚠'}
+        </span>
+        <span>{allReady ? '本体和用例均已就绪，可开始评估' : '本体或用例缺失，需补充后才能继续'}</span>
+      </div>
     </div>
   );
 }
@@ -7886,56 +5541,42 @@ function HumanScenarioProgressBar({ scenarios }) {
 
   return (
     <div className="human-progress-bar">
-      <div className="human-stepper">
-        {scenarios.map((s, i) => {
-          const done = s.status === 'completed';
-          const passed = done && s.verdict !== 'failed';
-          const failed = done && s.verdict === 'failed';
-          const cls = passed ? 'passed' : failed ? 'failed' : 'pending';
-          return (
-            <React.Fragment key={s.scenario_id}>
-              <div className={`human-stepper-step ${cls}`}>
-                <div className="human-stepper-dot">
-                  {passed ? '✓' : failed ? '×' : i + 1}
-                </div>
-                <span className="human-stepper-label">{s.scenario_name}</span>
-              </div>
-              {i < scenarios.length - 1 && <div className={`human-stepper-line ${done ? cls : ''}`} />}
-            </React.Fragment>
-          );
-        })}
+      <div className="human-progress-steps">
+        {scenarios.map((s, i) => (
+          <div key={s.scenario_id} className="human-progress-step">
+            <div className={`human-progress-pill ${s.status === 'completed' ? (s.verdict === 'passed' ? 'passed' : 'failed') : 'pending'}`}>
+              {s.status === 'completed' ? (s.verdict === 'passed' ? '✓' : '×') : '⏳'}
+              {s.scenario_name}
+            </div>
+            {i < scenarios.length - 1 && <span className="human-progress-arrow">→</span>}
+          </div>
+        ))}
       </div>
-      <span className="human-progress-pct">{completed}/{total} 完成 ({progress}%)</span>
+      <div className="human-progress-track">
+        <div className="human-progress-fill" style={{ width: `${progress}%` }} />
+        <span className="human-progress-label">{completed}/{total} 完成 ({progress}%)</span>
+      </div>
     </div>
   );
 }
 
 function HumanScenarioNavigator({ scenarios, currentScenarioId, onNavigate }) {
-  const [open, setOpen] = _useStateE(false);
   return (
     <div className="human-scenario-nav">
-      <div className="human-scenario-nav-title" style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }} onClick={() => setOpen(v => !v)}>
-        <span style={{ flex: 1 }}>评估场景</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-             style={{ width: 13, height: 13, color: 'var(--ink-4)', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.18s' }}>
-          <path d="M6 9l6 6 6-6"/>
-        </svg>
+      <div className="human-scenario-nav-title">评估场景</div>
+      <div className="human-scenario-nav-list">
+        {scenarios.map(s => (
+          <button
+            key={s.scenario_id}
+            className={`human-scenario-nav-item ${currentScenarioId === s.scenario_id ? 'active' : ''}`}
+            onClick={() => onNavigate(s.scenario_id)}
+          >
+            {s.status === 'completed' ? (s.verdict === 'passed' ? '✓' : '×') : '⏳'}
+            <span className="human-scenario-nav-name">{s.scenario_name}</span>
+            <span className="human-scenario-nav-count">{s.message_count}条</span>
+          </button>
+        ))}
       </div>
-      {open && (
-        <div className="human-scenario-nav-list">
-          {scenarios.map(s => (
-            <button
-              key={s.scenario_id}
-              className={`human-scenario-nav-item ${currentScenarioId === s.scenario_id ? 'active' : ''}`}
-              onClick={() => onNavigate(s.scenario_id)}
-            >
-              {s.status === 'completed' ? (s.verdict === 'passed' ? '✓' : '×') : '⏳'}
-              <span className="human-scenario-nav-name">{s.scenario_name}</span>
-              <span className="human-scenario-nav-count">{s.message_count}条</span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -8064,24 +5705,31 @@ function HumanChatMessage({ msg, scenarios, onVerdictSubmit, onOnboardingSubmit 
 
 function HumanVerdictPanel({ messageId, onSubmit }) {
   const [verdict, setVerdict] = _useStateE(null);
-
-  function handleClick(v) {
-    setVerdict(v);
-    if (onSubmit) onSubmit(v, '', messageId);
-  }
+  const [comment, setComment] = _useStateE('');
 
   return (
     <div className="human-verdict-panel">
       <div className="human-verdict-buttons">
-        <button className={`human-verdict-btn ${verdict === 'passed' ? 'passed active' : ''}`} onClick={() => handleClick('passed')}>
+        <button className={`human-verdict-btn ${verdict === 'passed' ? 'passed active' : ''}`} onClick={() => setVerdict('passed')}>
           <span className="human-verdict-btn-icon">👍</span>
           <span className="human-verdict-btn-label">满意</span>
         </button>
-        <button className={`human-verdict-btn ${verdict === 'failed' ? 'failed active' : ''}`} onClick={() => handleClick('failed')}>
+        <button className={`human-verdict-btn ${verdict === 'failed' ? 'failed active' : ''}`} onClick={() => setVerdict('failed')}>
           <span className="human-verdict-btn-icon">👎</span>
           <span className="human-verdict-btn-label">不满意</span>
         </button>
       </div>
+      <div className="human-verdict-comment">
+        <label>判定备注（可选）</label>
+        <input value={comment} onChange={e => setComment(e.target.value)} placeholder="填写判定原因..." />
+      </div>
+      <button
+        className={`human-verdict-submit ${verdict ? (verdict === 'passed' ? 'passed' : 'failed') : 'disabled'}`}
+        onClick={() => verdict && onSubmit && onSubmit(verdict, comment, messageId)}
+        disabled={!verdict}
+      >
+        确认判定
+      </button>
     </div>
   );
 }
@@ -8478,8 +6126,6 @@ function HumanEvalPage({ id, go, toast }) {
   const [rightCollapsed, setRightCollapsed] = _useStateE(false);
   const [showReportModal, setShowReportModal] = _useStateE(false);
   const [onboardingSubmitted, setOnboardingSubmitted] = _useStateE(false);
-  const [humanEvalPassed, setHumanEvalPassed] = _useStateE(false);
-  const [showPassConfirmModal, setShowPassConfirmModal] = _useStateE(false);
 
   const allCompleted = scenarios.every(s => s.status === 'completed');
   const hasOnboardingRequest = messages.some(m => m.type === 'onboarding_request');
@@ -8507,10 +6153,7 @@ function HumanEvalPage({ id, go, toast }) {
         </div>
         <div className="human-topbar-badges">
           <span className="human-badge green">AI 评估已通过</span>
-          {humanEvalPassed
-            ? <span className="human-badge green">人工评估通过</span>
-            : <span className="human-badge indigo">人工评估进行中</span>
-          }
+          <span className="human-badge indigo">人工评估进行中</span>
           {showReportButton && (
             <button className="btn btn-primary btn-sm" onClick={() => setShowReportModal(true)}>
               查看综合报告
@@ -8621,52 +6264,10 @@ function HumanEvalPage({ id, go, toast }) {
                 {artifactTab === 'trace' && <HumanTracePanel messages={messages} currentScenarioId={currentScenarioId} />}
                 {artifactTab === 'report' && <HumanReportPanel currentScenario={currentScenario} />}
               </div>
-              <div className="human-eval-pass-footer">
-                <button
-                  className={`btn btn-sm ${humanEvalPassed ? 'btn-pass-done' : 'btn-primary'}`}
-                  disabled={humanEvalPassed}
-                  onClick={() => setShowPassConfirmModal(true)}
-                >
-                  {humanEvalPassed ? '✓ 已通过人工评估' : '通过人工评估'}
-                </button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={!humanEvalPassed}
-                  onClick={() => {
-                    window.updateEmployee(e.id, { status: 'live', updated: '刚刚', activeAt: '刚刚' });
-                    toast('已发布上岗');
-                    go(`employee/${e.id}`);
-                  }}
-                >
-                  发布上岗
-                </button>
-              </div>
             </>
           )}
         </div>
       </div>
-
-      {showPassConfirmModal && (
-        <div className="human-modal-mask" onClick={() => setShowPassConfirmModal(false)}>
-          <div className="human-modal human-modal-confirm" onClick={ev => ev.stopPropagation()}>
-            <div className="human-modal-head">
-              <h2 className="human-modal-title">确认通过人工评估？</h2>
-              <button className="human-modal-close" onClick={() => setShowPassConfirmModal(false)}>×</button>
-            </div>
-            <div className="human-modal-confirm-body">
-              <p className="human-modal-confirm-desc">通过后，该数字员工的评估状态将更新为「人工评估通过」，并可进行发布上岗操作。</p>
-              <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowPassConfirmModal(false)}>取消</button>
-                <button className="btn btn-primary btn-sm" onClick={() => {
-                  setHumanEvalPassed(true);
-                  setShowPassConfirmModal(false);
-                  toast('人工评估已通过');
-                }}>确认</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showReportModal && (
         <div className="human-modal-mask" onClick={() => setShowReportModal(false)}>
@@ -9325,28 +6926,20 @@ function PublishPage({ id, role, go, toast }) {
 function ClonePage({ id, role, go, toast }) {
   const source = window.findEmployeeById(id) || window.DEPT_EMPLOYEES[0];
   const viewer = window.getViewer(role);
-  const [step, setStep] = _useStateF(0);            // 0: 配置信息  1: 确认上岗
-  const [pubPhase, setPubPhase] = _useStateF('idle'); // 'idle' | 'running' | 'done'
-  const [doneCount, setDoneCount] = _useStateF(0);
-  const [created, setCreated] = _useStateF(null);
-  const [name, setName] = _useStateF(`${source.name} · ${viewer.short}`);
+  const [step, setStep] = _useStateF(0);
+  const [name, setName] = _useStateF(`${source.name} · ${viewer.short}工`);
   const [initial, setInitial] = _useStateF(viewer.short);
   const [desc, setDesc] = _useStateF("我的个人版本，记得我的工作偏好和常用输出格式。");
 
-  const STEPS = ['配置个人信息', '确认上岗'];
-  const PUB_STEPS = ['确认上岗身份', '启动运行时', '状态切为 live'];
+  function submit() {
+    if (!name.trim()) {
+      toast("display_name 必填");
+      return;
+    }
 
-  function goToConfirm() {
-    if (!name.trim()) { toast("请填写分身名称"); return; }
-    setStep(1);
-    setPubPhase('idle');
-    setDoneCount(0);
-  }
-
-  function startPublish() {
     const mine = window.getMyEmployeesForRole(role);
-    const unique = window.uniqueName(name.trim(), mine);
-    const emp = window.addMyEmployee({
+    const unique = window.uniqueName(name, mine);
+    const created = window.addMyEmployee({
       id: window.generateId("pc"),
       type: "personal_clone",
       name: unique,
@@ -9362,150 +6955,80 @@ function ClonePage({ id, role, go, toast }) {
       tags: ["我的分身"],
       runs: 0
     });
-    setCreated(emp);
-    setPubPhase('running');
-    let pointer = 0;
-    const timer = setInterval(() => {
-      pointer += 1;
-      setDoneCount(pointer);
-      if (pointer >= PUB_STEPS.length) {
-        clearInterval(timer);
-        window.updateEmployee(emp.id, { status: "live", updated: "刚刚", activeAt: "刚刚" });
-        setTimeout(() => { setPubPhase('done'); toast("分身已成功上岗"); }, 300);
-      }
-    }, 600);
+
+    toast("分身草稿已创建，进入上岗确认");
+    go(`publish/${created.id}`);
   }
 
   return (
     <div className="page page-narrow">
-      <window.Crumb label={`返回 ${source.name} 详情`} onClick={() => go(`employee/${source.id}`)} />
+      <window.Crumb label="返回部门数字员工" onClick={() => go("dept")} />
 
-      <div className="page-header hero-header" style={{ marginBottom: 0 }}>
+      <div className="page-header hero-header">
         <div>
-          <span className="eyebrow">复制分身向导</span>
-          <h1 className="page-title">基于 <em>{source.name}</em> 创建你的分身</h1>
-          <p className="page-sub">直接继承评估结果，无需重走评估流程，完成配置后即可上岗。</p>
+          <span className="eyebrow">两步复制向导</span>
+          <h1 className="page-title">复制为我的分身 · <em>{source.name}</em></h1>
+          <p className="page-sub">复制流程只保留必要字段，不进入雇佣教练，也不进入双阶段评估。完成后直接进入上岗确认。</p>
         </div>
       </div>
 
-      {/* 步骤条 */}
-      <div className="clone-stepper">
-        {STEPS.map((label, idx) => (
-          <React.Fragment key={label}>
-            <div className={`clone-step ${idx < step ? 'done' : idx === step ? 'active' : ''}`}>
-              <span className="clone-step-num">{idx < step ? '✓' : idx + 1}</span>
-              <span className="clone-step-label">{label}</span>
+      <div className="steps">
+        {["确认复制", "配置个人信息并上岗"].map((item, idx) => (
+          <React.Fragment key={item}>
+            <div className={`step ${idx < step ? "done" : idx === step ? "active" : ""}`}>
+              <span className="num">{idx + 1}</span>
+              <span>{item}</span>
             </div>
-            {idx < STEPS.length - 1 && <div className="clone-step-line" />}
+            {idx < 1 && <span className="step-arrow">→</span>}
           </React.Fragment>
         ))}
       </div>
 
       <div className="card card-pad">
-
-        {/* ── Step 0：配置个人信息 ── */}
         {step === 0 && (
           <>
-            <div className="clone-source-strip">
-              <window.Avatar initial={source.initial} tint={source.tint} size="md" />
-              <div className="clone-source-info">
-                <span className="clone-source-eyebrow">基于部门员工</span>
-                <span className="clone-source-name">{source.name}</span>
-                <span className="clone-source-desc">{source.desc}</span>
-              </div>
-              <span className="pill green dot" style={{ alignSelf: 'flex-start', flexShrink: 0 }}>已上岗 · 继承评估</span>
-            </div>
-
-            <h3 className="section-h">配置你的分身信息</h3>
-            <div className="field-grid">
-              <div className="form-row">
-                <label>分身名称</label>
-                <input type="text" value={name} onChange={evt => setName(evt.target.value)} placeholder={`${source.name} · ${viewer.short}`} />
-              </div>
-              <div className="form-row">
-                <label>头像简称 <span className="form-hint">· 可选，最多 2 个字</span></label>
-                <input type="text" value={initial} onChange={evt => setInitial(evt.target.value)} placeholder={viewer.short} maxLength={2} />
-              </div>
-              <div className="form-row field-span-2">
-                <label>个人说明 <span className="form-hint">· 描述你对这个分身的个性化期望</span></label>
-                <textarea rows={3} value={desc} onChange={evt => setDesc(evt.target.value)} />
+            <div className="row" style={{ gap: 16 }}>
+              <window.Avatar initial={source.initial} tint={source.tint} size="xl" />
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>{source.name}</h3>
+                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>母版来自 {(window.findTemplateById(source.template) || {}).name} 模板</div>
+                <p style={{ marginTop: 12, color: "var(--c-body)" }}>{source.desc}</p>
               </div>
             </div>
-
-            <div className="callout info" style={{ marginTop: 16 }}>
-              上岗后可在分身详情页按需配置 IM，本向导不展开 IM 设置。
+            <div className="divider" />
+            <div className="callout info">
+              复制后会生成一个与你部门母版相互独立的个人实例。它直接继承部门员工的评估结果，不需要重新走 AI / 人工评估。
             </div>
-
-            <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => go(`employee/${source.id}`)}>取消</button>
-              <button className="btn btn-primary btn-sm" onClick={goToConfirm}>
-                下一步：确认上岗 <window.Icon.arrow className="icn" />
-              </button>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => go("dept")}>取消</button>
+              <button className="btn btn-primary btn-sm" onClick={() => setStep(1)}>下一步 <window.Icon.arrow className="icn" /></button>
             </div>
           </>
         )}
 
-        {/* ── Step 1：确认上岗 ── */}
         {step === 1 && (
           <>
-            <div className="clone-confirm-head">
-              <window.Avatar initial={(initial || viewer.short).slice(0, 2)} tint={source.tint} size="xl" />
-              <div className="clone-confirm-meta">
-                <h3 className="clone-confirm-name">{name}</h3>
-                <p className="clone-confirm-desc">{desc}</p>
+            <h3 className="section-h">配置个人信息</h3>
+            <div className="field-grid">
+              <div className="form-row">
+                <label>display_name</label>
+                <input type="text" value={name} onChange={evt => setName(evt.target.value)} />
+              </div>
+              <div className="form-row">
+                <label>display_avatar</label>
+                <input type="text" value={initial} onChange={evt => setInitial(evt.target.value)} placeholder="可选，默认沿用你的简称" />
+              </div>
+              <div className="form-row field-span-2">
+                <label>display_description</label>
+                <textarea value={desc} onChange={evt => setDesc(evt.target.value)} />
               </div>
             </div>
-            <div className="divider" />
-
-            <div className="clone-pub-steps">
-              {PUB_STEPS.map((label, idx) => {
-                const isDone = pubPhase === 'done' || doneCount > idx;
-                const isRunning = pubPhase === 'running' && doneCount === idx;
-                return (
-                  <div key={label} className={`clone-pub-step ${isDone ? 'step-done' : isRunning ? 'step-running' : ''}`}>
-                    <span className="clone-pub-step-icon">
-                      {isDone
-                        ? <span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>
-                        : isRunning
-                          ? <span className="clone-spin" style={{ color: '#6366f1' }}>↻</span>
-                          : <span style={{ color: '#d1d5db' }}>○</span>}
-                    </span>
-                    <span className="clone-pub-step-label">{label}</span>
-                    <span>
-                      {isDone
-                        ? <span className="pill green dot" style={{ fontSize: 11 }}>已完成</span>
-                        : isRunning
-                          ? <span className="pill blue" style={{ fontSize: 11 }}>进行中</span>
-                          : <span className="pill gray" style={{ fontSize: 11 }}>等待</span>}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="callout success">
+              上岗完成后平台会话立即可用；IM 配置会放到完成后的引导里，不在本向导内展开。
             </div>
-
-            {pubPhase === 'done' && (
-              <div className="callout success" style={{ marginTop: 16 }}>
-                分身已上岗！站内对话立即可用，如需接入 IM 可在分身详情页配置。
-              </div>
-            )}
-
-            <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-              {pubPhase === 'idle' && (
-                <>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setStep(0)}>上一步</button>
-                  <button className="btn btn-primary btn-sm" onClick={startPublish}>
-                    确认上岗 <window.Icon.arrow className="icn" />
-                  </button>
-                </>
-              )}
-              {pubPhase === 'running' && (
-                <button className="btn btn-primary btn-sm" disabled>上岗中…</button>
-              )}
-              {pubPhase === 'done' && (
-                <button className="btn btn-primary btn-sm" onClick={() => go(`employee/${created.id}`)}>
-                  查看我的分身 <window.Icon.arrow className="icn" />
-                </button>
-              )}
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setStep(0)}>上一步</button>
+              <button className="btn btn-primary btn-sm" onClick={submit}>创建并去上岗确认 <window.Icon.arrow className="icn" /></button>
             </div>
           </>
         )}

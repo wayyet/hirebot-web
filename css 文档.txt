@@ -1,0 +1,30 @@
+.bg-template {
+  width: 100%;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      ellipse 70% 45% at 18% 60%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(245, 250, 252, 0.75) 35%,
+      rgba(221, 239, 247, 0.35) 70%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 60% 45% at 88% 42%,
+      rgba(255, 255, 255, 0.75) 0%,
+      rgba(235, 247, 252, 0.45) 45%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      #a9d4ea 0%,
+      #cfe8f4 28%,
+      #eef7fa 54%,
+      #f8fbfc 70%,
+      #d8eef7 100%
+    );
+}
+
+<div class="bg-template"></div>
+
+<div class="min-h-screen bg-[radial-gradient(ellipse_70%_45%_at_18%_60%,rgba(255,255,255,.95)_0%,rgba(245,250,252,.75)_35%,rgba(221,239,247,.35)_70%,transparent_100%),radial-gradient(ellipse_60%_45%_at_88%_42%,rgba(255,255,255,.75)_0%,rgba(235,247,252,.45)_45%,transparent_100%),linear-gradient(180deg,#a9d4ea_0%,#cfe8f4_28%,#eef7fa_54%,#f8fbfc_70%,#d8eef7_100%)]"></div>
