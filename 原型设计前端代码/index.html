@@ -3205,7 +3205,7 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
     if (employee.status === "live" && isOwner) {
       actions.push({ label: "开始对话", primary: true, go: () => go(`chat/${employee.id}`) });
       if (window.getConnectedChannels(employee.id).length) actions.push({ label: "去 IM", go: () => setJumpPicker(true) });
-      actions.push({ label: "配置 IM", go: () => go(`im/${employee.id}`) });
+      actions.push({ label: "配置 IM", go: () => setImModal(true) });
       if ((employee.type === "personal_clone" || employee.role === "部门分身") && !employee.customized && !employee.customizing) actions.push({ label: "私人定制", go: () => go(`customize/${employee.id}`) });
       actions.push({
         label: "退役",
@@ -3242,6 +3242,7 @@ function EmployeeDetailPage({ id, role, go, toast }) {
   const employee = window.findEmployeeById(id);
   const [jumpPicker, setJumpPicker] = _useState2(false);
   const [capOpen, setCapOpen] = _useState2(false);
+  const [imModal, setImModal] = _useState2(false);
   if (!employee) return null;
 
   const viewer = window.getViewer(role);
@@ -3361,7 +3362,7 @@ function EmployeeDetailPage({ id, role, go, toast }) {
           <div className="card card-pad">
             <div className="row between wrap" style={{ marginBottom: 14 }}>
               <h3 className="section-h" style={{ marginBottom: 0 }}>IM 接入区</h3>
-              <button className="btn btn-ghost btn-sm" onClick={() => go(`im/${employee.id}`)}>前往多平台 IM 配置</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setImModal(true)}>前往多平台 IM 配置</button>
             </div>
 
             <div className="grid grid-3">
@@ -3384,7 +3385,7 @@ function EmployeeDetailPage({ id, role, go, toast }) {
                       <span className={`pill ${status === "connected" ? "green" : status === "error" ? "pink" : "gray"} dot`}>{statusText}</span>
                     </div>
                     <div className="spacer-16" />
-                    <button className="btn btn-ghost btn-sm" onClick={() => status === "connected" ? setJumpPicker(true) : go(`im/${employee.id}`)}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => status === "connected" ? setJumpPicker(true) : setImModal(true)}>
                       {actionLabel}
                     </button>
                   </div>
@@ -3399,7 +3400,13 @@ function EmployeeDetailPage({ id, role, go, toast }) {
         open={jumpPicker}
         employee={employee}
         onClose={() => setJumpPicker(false)}
-        onConfig={() => go(`im/${employee.id}`)}
+        onConfig={() => { setJumpPicker(false); setImModal(true); }}
+      />
+      <window.IMConfigModal
+        open={imModal}
+        employeeId={employee.id}
+        onClose={() => setImModal(false)}
+        toast={toast}
       />
     </div>
   );
@@ -8932,6 +8939,180 @@ function buildBotReply(employee, prompt) {
   return "我已经收到这条任务，会先按你当前分身的规则组织答案；如果涉及边界不清的地方，我会先提示你确认。";
 }
 
+function IMConfigModal({ open, employeeId, onClose, toast }) {
+  const [bindings, setBindings] = _useStateF({});
+  const [channelId, setChannelId] = _useStateF("lark");
+  const [methodId, setMethodId] = _useStateF("websocket");
+  const [form, setForm] = _useStateF({});
+  const [phase, setPhase] = _useStateF(0);
+  const [steps, setSteps] = _useStateF([]);
+
+  _useEffectF(() => {
+    if (!open) return;
+    const emp = window.findEmployeeById(employeeId);
+    if (!emp) return;
+    const b = window.getEmployeeBindings(emp.id);
+    const firstChannel = window.getConnectedChannels(emp.id)[0] || "lark";
+    const existing = window.getBinding(emp.id, firstChannel);
+    setBindings(b);
+    setChannelId(firstChannel);
+    setMethodId(existing ? existing.methodId : "websocket");
+    setForm(existing ? { ...existing.form } : {});
+    setPhase(0);
+    setSteps(buildConnectSteps(firstChannel, existing ? existing.methodId : "websocket"));
+  }, [open, employeeId]);
+
+  const employee = window.findEmployeeById(employeeId);
+  if (!open || !employee) return null;
+
+  const schema = IM_SCHEMAS[channelId];
+  const method = schema.methods[methodId];
+  const currentBinding = bindings[channelId];
+  const webhookUrl = method.webhookPath ? `https://{platform}/im/${method.webhookPath}/webhook/${employee.id}` : "";
+
+  function handleSwitchChannel(nextId) {
+    if (phase === 1 || nextId === channelId) return;
+    const nb = bindings[nextId];
+    const nm = nb ? nb.methodId : "websocket";
+    setChannelId(nextId);
+    setMethodId(nm);
+    setForm(nb ? { ...nb.form } : {});
+    setPhase(0);
+    setSteps(buildConnectSteps(nextId, nm));
+  }
+
+  function handleSwitchMethod(nextId) {
+    if (phase === 1 || nextId === methodId) return;
+    setMethodId(nextId);
+    setForm({});
+    setPhase(0);
+    setSteps(buildConnectSteps(channelId, nextId));
+  }
+
+  function handleFieldChange(key, val) {
+    setForm(prev => ({ ...prev, [key]: val }));
+  }
+
+  function removeCurrentBinding() {
+    const next = window.removeEmployeeBinding(employee.id, channelId);
+    setBindings(next);
+    setForm({});
+    setPhase(0);
+    setSteps(buildConnectSteps(channelId, "websocket"));
+    setMethodId("websocket");
+    toast(`${schema.title} 绑定已解除`);
+  }
+
+  function startConnect() {
+    const missing = method.fields.find(f => f.required && !(form[f.key] || "").trim());
+    if (missing) { toast(`${missing.label} 必填`); return; }
+    const nextSteps = buildConnectSteps(channelId, methodId);
+    setPhase(1);
+    setSteps(nextSteps);
+    let ptr = 0;
+    const timer = setInterval(() => {
+      setSteps(prev => prev.map((s, i) => i === ptr ? { ...s, done: true } : s));
+      ptr += 1;
+      if (ptr >= nextSteps.length) {
+        clearInterval(timer);
+        setTimeout(() => {
+          window.saveEmployeeBinding(employee.id, channelId, {
+            channelId, methodId, form: { ...form }, status: "connected", connectedAt: window.formatNow()
+          });
+          setBindings(window.getEmployeeBindings(employee.id));
+          setPhase(2);
+          toast(`${schema.title} 已连接`);
+        }, 350);
+      }
+    }, 500);
+  }
+
+  const footer = phase === 1 ? null : phase === 2
+    ? (<button className="btn btn-primary btn-sm" onClick={onClose}>完成</button>)
+    : (
+      <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {currentBinding && <button className="btn btn-danger-ghost btn-sm" onClick={removeCurrentBinding}>解除绑定</button>}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>取消</button>
+          <button className="btn btn-primary btn-sm" onClick={startConnect}>
+            {currentBinding ? "保存并重连" : "注册并连接"} <window.Icon.arrow className="icn" />
+          </button>
+        </div>
+      </div>
+    );
+
+  return (
+    <Modal open={open} onClose={phase !== 1 ? onClose : undefined} lg
+      title="接入平台"
+      sub={`${schema.title} · ${employee.name}`}
+      footer={footer}
+    >
+      <div className="channel-tabbar" style={{ marginBottom: 16 }}>
+        {Object.keys(IM_SCHEMAS).map(key => {
+          const st = bindings[key] ? (bindings[key].status || "connected") : "unconfigured";
+          return (
+            <button key={key} className={`channel-tab ${channelId === key ? "active" : ""}`}
+              onClick={() => handleSwitchChannel(key)}>
+              <span className={`jump-chip-mark ${window.IM_CHANNEL_META[key].accent}`}>{window.IM_CHANNEL_META[key].short}</span>
+              <span>{window.IM_CHANNEL_META[key].name}</span>
+              <span className={`pill ${st === "connected" ? "green" : "gray"} dot`}>{st === "connected" ? "已连接" : "未配置"}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {phase === 0 && (
+        <>
+          <div className="subtabs" style={{ marginBottom: 12 }}>
+            {Object.entries(schema.methods).map(([key, item]) => (
+              <button key={key} className={`subtab ${methodId === key ? "active" : ""}`} onClick={() => handleSwitchMethod(key)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="callout info" style={{ marginBottom: 16 }}>{method.help}</div>
+          <div className="field-grid">
+            {method.fields.map((field, idx) => (
+              <div key={field.key} className={`form-row${method.fields.length % 2 === 1 && idx === method.fields.length - 1 ? " field-span-2" : ""}`}>
+                <label>{field.label} <span className="muted">· {field.required ? "必填" : "可选"}</span></label>
+                <input type="text" value={form[field.key] || ""} placeholder={field.placeholder} onChange={evt => handleFieldChange(field.key, evt.target.value)} />
+              </div>
+            ))}
+          </div>
+          {webhookUrl && (
+            <div style={{ marginTop: 12 }} className="inline-panel">
+              <div className="inline-panel-title">Webhook URL</div>
+              <div className="file-chip" style={{ width: "100%", justifyContent: "space-between" }}>
+                <span>{webhookUrl}</span><span className="ok">一键复制</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {phase === 1 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {steps.map((s, i) => (
+            <div key={`${s.name}-${i}`} className="flow-step">
+              <span>{s.name}</span>
+              {s.done ? <span className="pill green dot">已完成</span> : <span className="pill gray">进行中</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {phase === 2 && (
+        <div className="callout success">
+          <span style={{ fontSize: 18 }}>🛡️</span>
+          <div>当前实例已成功绑定到 {schema.title}，后续可以直接从卡片、详情页或站内对话页顶部"去 IM"。</div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function IMConfigPage({ id, go, toast }) {
   const employee = window.findEmployeeById(id);
   const [jumpPicker, setJumpPicker] = _useStateF(false);
@@ -9854,6 +10035,7 @@ function ChatPage({ id, role, go, toast }) {
   const [draft, setDraft] = _useStateF("");
   const [typing, setTyping] = _useStateF(false);
   const [jumpPicker, setJumpPicker] = _useStateF(false);
+  const [imModal, setImModal] = _useStateF(false);
   if (!employee) return null;
 
   const isOwner = employee.owner === viewer.name;
@@ -9903,7 +10085,7 @@ function ChatPage({ id, role, go, toast }) {
           <div className="row wrap" style={{ gap: 8 }}>
             {window.getConnectedChannels(employee.id).length > 0
               ? <button className="btn btn-ghost btn-sm" onClick={() => setJumpPicker(true)}>去 IM</button>
-              : <button className="btn btn-ghost btn-sm" onClick={() => go(`im/${employee.id}`)}>接入 IM</button>}
+              : <button className="btn btn-ghost btn-sm" onClick={() => setImModal(true)}>接入 IM</button>}
             <button className="btn btn-ghost btn-sm" onClick={clearHistory}>清空历史</button>
           </div>
         </div>
@@ -9956,16 +10138,20 @@ function ChatPage({ id, role, go, toast }) {
         open={jumpPicker}
         employee={employee}
         onClose={() => setJumpPicker(false)}
-        onConfig={() => {
-          setJumpPicker(false);
-          go(`im/${employee.id}`);
-        }}
+        onConfig={() => { setJumpPicker(false); setImModal(true); }}
+      />
+      <window.IMConfigModal
+        open={imModal}
+        employeeId={employee.id}
+        onClose={() => setImModal(false)}
+        toast={toast}
       />
     </div>
   );
 }
 
 Object.assign(window, {
+  IMConfigModal,
   IMConfigPage,
   PublishPage,
   ClonePage,
