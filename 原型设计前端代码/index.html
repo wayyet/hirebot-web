@@ -2020,13 +2020,13 @@ function MoreMenu({ items }) {
   );
 }
 
-function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM, onCustomize }) {
+function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM, onCustomize, onRetire }) {
   const status = emp.status;
   if (status === "live") {
     const canCustomize = (emp.type === "personal_clone" || emp.role === "部门分身") && !emp.customized && !emp.customizing;
     const moreItems = [];
     if (canCustomize) moreItems.push({ label: "私人定制", onClick: onCustomize });
-    moreItems.push({ label: "退役", danger: true });
+    moreItems.push({ label: "退役", danger: true, onClick: () => onRetire && onRetire(emp.id) });
     return (
       <div className="action-stack">
         <button className="action-primary" onClick={onStartChat}>开始对话</button>
@@ -2053,7 +2053,7 @@ function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM, onCusto
       </div>
     );
   }
-  if (status === "pending") {
+  if (status === "pending" || status === "retired") {
     return (
       <div className="action-stack">
         <button className="action-primary" onClick={() => onReEnable && onReEnable(emp.id)}>
@@ -2136,9 +2136,9 @@ function IntroStat({ icon, value, label }) {
   );
 }
 
-function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, onCustomize, statusMap }) {
+function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, onCustomize, onRetire, statusMap }) {
   const d = DETAIL_DATA[emp.id] || {};
-  const s = statusMap[emp.status];
+  const s = statusMap[emp.status] || { label: "已退役", cls: "status-pending" };
 
   const handleReEnable = (id) => {
     onReEnable && onReEnable(id);
@@ -2178,7 +2178,7 @@ function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfi
             <p className="detail-desc">{emp.desc}</p>
           </div>
         </div>
-        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM} onCustomize={onCustomize}/>
+        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM} onCustomize={onCustomize} onRetire={onRetire}/>
       </section>
 
       {/* ============= unified intro card ============= */}
@@ -2484,11 +2484,11 @@ function ImStrip({ im }) {
 }
 
 function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM, onGoEval }) {
-  const s = statusMap[emp.status];
+  const s = statusMap[emp.status] || { label: "已退役", cls: "status-pending" };
   const isLive   = emp.status === "live";
   const isAiEval = emp.status === "evaluating";
   const isHumanEval = emp.status === "humanEval";
-  const isRetired = emp.status === "pending";
+  const isRetired = emp.status === "pending" || emp.status === "retired";
   const stop = (fn) => (e) => { e.stopPropagation(); fn && fn(); };
   return (
     <div className="card" onClick={() => onOpen && onOpen(emp.id)} role="button" tabIndex={0}>
@@ -2555,10 +2555,25 @@ function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM, onGoEval
 }
 
 function CardView({ list, onReEnable, onRemove, onOpen, onStartChat, onGoIM, onGoEval }) {
+  const active = list.filter((e) => e.status !== "pending" && e.status !== "retired");
+  const retired = list.filter((e) => e.status === "pending" || e.status === "retired");
   return (
-    <div className="grid">
-      {list.map((e) => <Card key={e.id} emp={e} onReEnable={onReEnable} onRemove={onRemove} onOpen={onOpen} onStartChat={onStartChat} onGoIM={onGoIM} onGoEval={onGoEval}/>)}
-    </div>
+    <>
+      <div className="grid">
+        {active.map((e) => <Card key={e.id} emp={e} onReEnable={onReEnable} onRemove={onRemove} onOpen={onOpen} onStartChat={onStartChat} onGoIM={onGoIM} onGoEval={onGoEval}/>)}
+      </div>
+      {retired.length > 0 && (
+        <>
+          <div style={{ marginTop: 32, marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: "var(--c-body-soft)" }}>已退役</span>
+            <span style={{ fontSize: 12, color: "var(--c-body-soft)", background: "var(--c-border-row)", borderRadius: 20, padding: "1px 8px" }}>{retired.length}</span>
+          </div>
+          <div className="grid" style={{ opacity: 0.7 }}>
+            {retired.map((e) => <Card key={e.id} emp={e} onReEnable={onReEnable} onRemove={onRemove} onOpen={onOpen} onStartChat={onStartChat} onGoIM={onGoIM} onGoEval={onGoEval}/>)}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -3002,30 +3017,40 @@ function MyPage({ role, go }) {
     setChatEmpId(empId);
   };
 
+  const [retireConfirmId, setRetireConfirmId] = _myUs(null);
+
   const reEnable = (id) =>
     setEmpList((L) => L.map((e) => (e.id === id ? { ...e, status: "live", lastUpdate: "刚刚重新启用" } : e)));
+  const retire = (id) => {
+    setEmpList((L) => L.map((e) => (e.id === id ? { ...e, status: "pending", lastUpdate: "刚刚退役" } : e)));
+    setRetireConfirmId(null);
+    setDetailId(null);
+  };
   const remove = (id) =>
     setEmpList((L) => L.filter((e) => e.id !== id));
 
   const list = _myUm(() => {
     // 在列表模式下只能选到可对话的员工，面包调整为已上岗。
-    const pool = view === "list" ? empList.filter((e) => e.status === "live") : empList;
+    const pool = view === "list"
+      ? empList.filter((e) => e.status !== "pending" && e.status !== "retired")
+      : empList;
     if (filter === "全部") return pool;
     if (filter === "已上岗") return pool.filter((e) => e.status === "live");
     if (filter === "实习中") return pool.filter((e) => e.status === "evaluating" || e.status === "humanEval");
     if (filter === "私人定制") return pool.filter((e) => e.role === "私人定制");
-    if (filter === "已退役") return pool.filter((e) => e.status === "pending");
+    if (filter === "已退役") return pool.filter((e) => e.status === "pending" || e.status === "retired");
     return pool;
   }, [filter, view, empList]);
 
   const counts = _myUm(() => {
-    const pool = view === "list" ? empList.filter((e) => e.status === "live") : empList;
+    const activePool = empList.filter((e) => e.status !== "pending" && e.status !== "retired");
+    const pool = view === "list" ? activePool : empList;
     return {
-      all:        pool.length,
+      all:        view === "list" ? activePool.length : empList.length,
       live:       pool.filter((e) => e.status === "live").length,
       intern:     pool.filter((e) => e.status === "evaluating" || e.status === "humanEval").length,
       custom:     pool.filter((e) => e.role === "私人定制").length,
-      pending:    pool.filter((e) => e.status === "pending").length,
+      pending:    empList.filter((e) => e.status === "pending" || e.status === "retired").length,
     };
   }, [view, empList]);
 
@@ -3075,6 +3100,7 @@ function MyPage({ role, go }) {
               onStartChat={() => startChat(emp.id)}
               onGoIM={() => setGoImEmpId(emp.id)}
               onCustomize={() => go(`customize/${emp.id}`)}
+              onRetire={(id) => setRetireConfirmId(id)}
               onConfigurePlatform={(platform) => {
                 if (emp.im[platform] === "connected") return;
                 openConfigure(emp.id, platform);
@@ -3115,6 +3141,25 @@ function MyPage({ role, go }) {
         emp={empList.find((e) => e.id === goImEmpId)}
         onClose={() => setGoImEmpId(null)}
       />
+
+      {retireConfirmId && (
+        <div className="modal-mask" onClick={() => setRetireConfirmId(null)}>
+          <div className="modal" style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3 className="modal-title">确认退役？</h3>
+              <p className="modal-sub">
+                退役后该员工将停止响应，不再出现在列表模式和"已上岗"分类中。
+                可随时从"已退役"分类重新启用。
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost btn-sm" onClick={() => setRetireConfirmId(null)}>取消</button>
+              <button className="btn btn-sm" style={{ background: "var(--c-danger, #e53e3e)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: 500, cursor: "pointer" }}
+                onClick={() => retire(retireConfirmId)}>确认退役</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -3209,11 +3254,7 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
       if ((employee.type === "personal_clone" || employee.role === "部门分身") && !employee.customized && !employee.customizing) actions.push({ label: "私人定制", go: () => go(`customize/${employee.id}`) });
       actions.push({
         label: "退役",
-        go: () => {
-          window.updateEmployee(employee.id, { status: "retired", updated: "刚刚", activeAt: "—" });
-          toast("已退役，仍可从历史记录中查看");
-          go("my");
-        }
+        go: () => setRetireConfirm(true)
       });
     }
     if ((employee.status === "interning_ai" || employee.status === "interning_human") && isOwner) {
@@ -3231,7 +3272,14 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
   }
 
   if (employee.status === "retired") {
-    actions.push({ label: "查看历史", primary: true, go: () => go(`employee/${employee.id}`) });
+    actions.push({
+      label: "重新启用", primary: true,
+      go: () => {
+        window.updateEmployee(employee.id, { status: "live", updated: "刚刚", activeAt: "刚刚" });
+        toast("已重新启用，员工现已上岗");
+        go("my");
+      }
+    });
     if (employee.parent) actions.push({ label: "重新复制", go: () => go(`clone/${employee.parent}`) });
   }
 
@@ -3243,6 +3291,7 @@ function EmployeeDetailPage({ id, role, go, toast }) {
   const [jumpPicker, setJumpPicker] = _useState2(false);
   const [capOpen, setCapOpen] = _useState2(false);
   const [imModal, setImModal] = _useState2(false);
+  const [retireConfirm, setRetireConfirm] = _useState2(false);
   if (!employee) return null;
 
   const viewer = window.getViewer(role);
@@ -3407,6 +3456,24 @@ function EmployeeDetailPage({ id, role, go, toast }) {
         employeeId={employee.id}
         onClose={() => setImModal(false)}
         toast={toast}
+      />
+      <window.Modal
+        open={retireConfirm}
+        onClose={() => setRetireConfirm(false)}
+        title="确认退役？"
+        sub={`「${employee.name}」退役后将停止响应，可随时重新启用。`}
+        footer={
+          <React.Fragment>
+            <button className="btn btn-ghost btn-sm" onClick={() => setRetireConfirm(false)}>取消</button>
+            <button className="btn btn-sm" style={{ background: "#e53e3e", color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: 500, cursor: "pointer" }}
+              onClick={() => {
+                window.updateEmployee(employee.id, { status: "retired", updated: "刚刚", activeAt: "—" });
+                toast("已退役，可从已退役分类重新启用");
+                setRetireConfirm(false);
+                go("my");
+              }}>确认退役</button>
+          </React.Fragment>
+        }
       />
     </div>
   );
