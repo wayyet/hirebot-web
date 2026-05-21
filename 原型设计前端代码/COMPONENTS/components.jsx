@@ -293,7 +293,6 @@ function EmployeeCard({ emp, onClick, footerActions, extraPanel, cardHint }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row between" style={{ gap: 8 }}>
             <h4 className="emp-name">{emp.name}</h4>
-            <StatusPill status={emp.status} />
           </div>
           <div className="emp-meta">
             <TypePill type={emp.type} />

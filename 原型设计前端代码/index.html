@@ -659,9 +659,9 @@ function resolveTopNav(route) {
   if (route.startsWith("employee/") || route.startsWith("publish/") || route.startsWith("eval-ai/") || route.startsWith("eval-human/") || route.startsWith("review/")) {
     return employee && employee.type === "department" ? "dept" : "my";
   }
-  if (route.startsWith("branch/")) return "my";
+  if (route.startsWith("branch/") || route.startsWith("customize/")) return "my";
   if (route.startsWith("hire/")) return employee && employee.type === "department" ? "dept" : "my";
-  return null;
+  return "dept";
 }
 
 function TopNav({ role, setRole, route, go }) {
@@ -866,7 +866,6 @@ function EmployeeCard({ emp, onClick, footerActions, extraPanel, cardHint }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row between" style={{ gap: 8 }}>
             <h4 className="emp-name">{emp.name}</h4>
-            <StatusPill status={emp.status} />
           </div>
           <div className="emp-meta">
             <TypePill type={emp.type} />
@@ -1108,11 +1107,12 @@ function TemplatesPage({ go }) {
 function DeptPage({ role, go }) {
   const isManager = role === "manager";
   const [query, setQuery] = _useState1("");
-  const [tab, setTab] = _useState1("live");
+  const [tab, setTab] = _useState1("all");
   const [subtab, setSubtab] = _useState1("ai");
 
   const tabs = isManager
     ? [
+        { id: "all", label: "全部", filter: () => true },
         { id: "hired", label: "已雇佣", filter: item => item.status === "hired" || item.status === "failed" },
         { id: "intern", label: "待实习", filter: item => item.status === "interning_ai" || item.status === "interning_human" },
         { id: "live", label: "已上岗", filter: item => item.status === "live" }
@@ -1131,6 +1131,7 @@ function DeptPage({ role, go }) {
   }
 
   const counts = {
+    all: window.DEPT_EMPLOYEES.length,
     hired: window.DEPT_EMPLOYEES.filter(item => item.status === "hired" || item.status === "failed").length,
     intern: window.DEPT_EMPLOYEES.filter(item => item.status === "interning_ai" || item.status === "interning_human").length,
     live: window.DEPT_EMPLOYEES.filter(item => item.status === "live").length
@@ -2038,17 +2039,18 @@ function MoreMenu({ items }) {
   );
 }
 
-function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM }) {
+function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM, onCustomize }) {
   const status = emp.status;
   if (status === "live") {
+    const canCustomize = (emp.type === "personal_clone" || emp.role === "部门分身") && !emp.customized && !emp.customizing;
+    const moreItems = [];
+    if (canCustomize) moreItems.push({ label: "私人定制", onClick: onCustomize });
+    moreItems.push({ label: "退役", danger: true });
     return (
       <div className="action-stack">
         <button className="action-primary" onClick={onStartChat}>开始对话</button>
         <button className="action-ghost" onClick={onGoIM}>去 IM</button>
-        <MoreMenu items={[
-          { label: "私人定制" },
-          { label: "退役", danger: true },
-        ]}/>
+        <MoreMenu items={moreItems}/>
       </div>
     );
   }
@@ -2153,7 +2155,7 @@ function IntroStat({ icon, value, label }) {
   );
 }
 
-function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, statusMap }) {
+function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, onCustomize, statusMap }) {
   const d = DETAIL_DATA[emp.id] || {};
   const s = statusMap[emp.status];
 
@@ -2195,7 +2197,7 @@ function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfi
             <p className="detail-desc">{emp.desc}</p>
           </div>
         </div>
-        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM}/>
+        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM} onCustomize={onCustomize}/>
       </section>
 
       {/* ============= unified intro card ============= */}
@@ -2501,7 +2503,7 @@ function ImStrip({ im }) {
   );
 }
 
-function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM }) {
+function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM, onGoEval }) {
   const s = statusMap[emp.status];
   const isLive   = emp.status === "live";
   const isAiEval = emp.status === "evaluating";
@@ -2555,10 +2557,10 @@ function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM }) {
             </>
           )}
           {isAiEval && (
-            <button className="btn-primary" onClick={(e) => e.stopPropagation()}>进入 AI 评估</button>
+            <button className="btn-primary" onClick={(e) => { e.stopPropagation(); onGoEval && onGoEval(emp.id, "ai"); }}>进入 AI 评估</button>
           )}
           {isHumanEval && (
-            <button className="btn-primary" onClick={(e) => e.stopPropagation()}>进入人工评估</button>
+            <button className="btn-primary" onClick={(e) => { e.stopPropagation(); onGoEval && onGoEval(emp.id, "human"); }}>进入人工评估</button>
           )}
           {isRetired && (
             <>
@@ -2572,10 +2574,10 @@ function Card({ emp, onReEnable, onRemove, onOpen, onStartChat, onGoIM }) {
   );
 }
 
-function CardView({ list, onReEnable, onRemove, onOpen, onStartChat, onGoIM }) {
+function CardView({ list, onReEnable, onRemove, onOpen, onStartChat, onGoIM, onGoEval }) {
   return (
     <div className="grid">
-      {list.map((e) => <Card key={e.id} emp={e} onReEnable={onReEnable} onRemove={onRemove} onOpen={onOpen} onStartChat={onStartChat} onGoIM={onGoIM}/>)}
+      {list.map((e) => <Card key={e.id} emp={e} onReEnable={onReEnable} onRemove={onRemove} onOpen={onOpen} onStartChat={onStartChat} onGoIM={onGoIM} onGoEval={onGoEval}/>)}
     </div>
   );
 }
@@ -3076,8 +3078,9 @@ function MyPage({ role, go }) {
               onOpenImConfig={() => setImCfgId(emp.id)}
               onStartChat={() => startChat(emp.id)}
               onGoIM={() => setGoImEmpId(emp.id)}
+              onCustomize={() => go(`customize/${emp.id}`)}
               onConfigurePlatform={(platform) => {
-                if (emp.im[platform] === "connected") return; // 已连接 → 看作跳转去 IM，不开弹窗
+                if (emp.im[platform] === "connected") return;
                 openConfigure(emp.id, platform);
               }}
               statusMap={statusMap}
@@ -3108,7 +3111,7 @@ function MyPage({ role, go }) {
         <Toolbar filter={filter} setFilter={setFilter} view={view} setView={setView} counts={counts}/>
 
         {view === "card"
-          ? <CardView list={list} onReEnable={reEnable} onRemove={remove} onOpen={setDetailId} onStartChat={startChat} onGoIM={setGoImEmpId}/>
+          ? <CardView list={list} onReEnable={reEnable} onRemove={remove} onOpen={setDetailId} onStartChat={startChat} onGoIM={setGoImEmpId} onGoEval={(id, type) => go(type === "ai" ? `eval-ai/${id}` : `eval-human/${id}`)}/>
           : <ListChatView list={list} requestedActiveId={chatEmpId} onRequestConsumed={() => setChatEmpId(null)} onGoIM={setGoImEmpId}/>}
       </div>
       <GoIMModal
@@ -3207,7 +3210,7 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
       actions.push({ label: "开始对话", primary: true, go: () => go(`chat/${employee.id}`) });
       if (window.getConnectedChannels(employee.id).length) actions.push({ label: "去 IM", go: () => setJumpPicker(true) });
       actions.push({ label: "配置 IM", go: () => go(`im/${employee.id}`) });
-      if (employee.type === "personal_clone") actions.push({ label: "创建私有分支", go: () => go(`branch/${employee.id}`) });
+      if ((employee.type === "personal_clone" || employee.role === "部门分身") && !employee.customized && !employee.customizing) actions.push({ label: "私人定制", go: () => go(`customize/${employee.id}`) });
       actions.push({
         label: "退役",
         go: () => {
@@ -5536,7 +5539,8 @@ function HirePage({ id, tpl, go, toast }) {
     ? window.findTemplateById(tpl)
     : (existing ? window.findTemplateById(existing.template) : window.TEMPLATES[0]);
   const isBranchFlow = !!existing && existing.type === "private_branch";
-  const backTo = isBranchFlow ? "my" : "dept";
+  const isCustomizeFlow = !!existing && existing.type === "personal_clone" && !!existing.customizing;
+  const backTo = (isBranchFlow || isCustomizeFlow) ? "my" : "dept";
   const cacheKey = `${HIRE_V2_CACHE_PREFIX}:${existing ? existing.id : `tpl:${template && template.id}`}`;
   const savedFlow = readFlowCache(cacheKey);
 
@@ -8633,9 +8637,13 @@ function HumanEvalPage({ id, go, toast }) {
                   className="btn btn-primary btn-sm"
                   disabled={!humanEvalPassed}
                   onClick={() => {
-                    window.updateEmployee(e.id, { status: 'live', updated: '刚刚', activeAt: '刚刚' });
-                    toast('已发布上岗');
-                    go(`employee/${e.id}`);
+                    const isCustomize = e.customizing;
+                    window.updateEmployee(e.id, {
+                      status: 'live', updated: '刚刚', activeAt: '刚刚',
+                      ...(isCustomize ? { customized: true, customizing: false } : {})
+                    });
+                    toast(isCustomize ? '私人定制完成，已重新上岗' : '已发布上岗');
+                    go(isCustomize ? 'my' : `employee/${e.id}`);
                   }}
                 >
                   发布上岗
@@ -9641,6 +9649,86 @@ function QuickClonePage({ id, go, toast }) {
   );
 }
 
+function CustomizePage({ id, go, toast }) {
+  const emp = window.findEmployeeById(id);
+  const [confirmed, setConfirmed] = _useStateF(false);
+
+  if (!emp) return null;
+
+  if (emp.customized) {
+    return (
+      <div className="page page-narrow">
+        <window.Crumb label="返回我的数字员工" onClick={() => go("my")} />
+        <div className="empty">
+          <div className="ic">⛔</div>
+          <h4>该员工已完成过一次私人定制</h4>
+          <p>每个分身只能定制一次。如需使用部门原版，请从部门数字员工重新复制。</p>
+        </div>
+      </div>
+    );
+  }
+
+  function startCustomize() {
+    window.updateEmployee(id, { status: "hired", hireProgress: 0, customizing: true, updated: "刚刚" });
+    toast("已启动私人定制，进入重新雇佣流程");
+    go(`hire/${id}`);
+  }
+
+  return (
+    <div className="page page-narrow">
+      <window.Crumb label="返回我的数字员工" onClick={() => go("my")} />
+
+      <div className="page-header hero-header">
+        <div>
+          <span className="eyebrow">私人定制</span>
+          <h1 className="page-title">对 <em>{emp.name}</em> 进行私人定制</h1>
+          <p className="page-sub">定制将覆盖当前分身，走完雇佣→AI评估→人工评估→发布后重新上岗。每个分身只能定制一次，不支持回退。</p>
+        </div>
+      </div>
+
+      <div className="card card-pad">
+        <div className="row" style={{ gap: 16, alignItems: "flex-start" }}>
+          <window.Avatar initial={emp.initial} tint={emp.tint} size="lg" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 16 }}>{emp.name}</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>我的分身 · 已上岗 · 最近更新 {emp.updated}</div>
+            <p style={{ marginTop: 10, color: "var(--c-body)", fontSize: 14 }}>{emp.desc}</p>
+          </div>
+        </div>
+
+        <div className="divider" />
+
+        <div className="callout" style={{ background: "var(--c-bg-soft, #f5f5f5)", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>注意事项</div>
+          <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: "var(--c-body)", lineHeight: 1.8 }}>
+            <li>启动定制后，员工状态立即变为「雇佣中」，原有上岗能力暂时不可用。</li>
+            <li>完成定制并发布上岗后，原有分身被覆盖，不可恢复。</li>
+            <li>每个分身只能进行一次私人定制，完成后此入口不再显示。</li>
+            <li>如需保留原版，请先从部门数字员工重新复制一份再定制。</li>
+          </ul>
+        </div>
+
+        {!confirmed ? (
+          <div className="row" style={{ justifyContent: "flex-end", gap: 10 }}>
+            <button className="btn btn-ghost" onClick={() => go("my")}>取消</button>
+            <button className="btn btn-primary" onClick={() => setConfirmed(true)}>我已了解，继续</button>
+          </div>
+        ) : (
+          <div>
+            <div className="callout danger" style={{ padding: "12px 14px", marginBottom: 14, borderRadius: 8 }}>
+              确认后将立即启动定制流程，员工将脱离已上岗状态。
+            </div>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmed(false)}>返回</button>
+              <button className="btn btn-primary" onClick={startCustomize}>确认开始定制</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BranchPage({ id, role, go, toast }) {
   const source = window.findEmployeeById(id);
   const viewer = window.getViewer(role);
@@ -9894,6 +9982,7 @@ Object.assign(window, {
   ClonePage,
   QuickClonePage,
   BranchPage,
+  CustomizePage,
   ChatPage
 });
 /* global window, React, ReactDOM */
@@ -9951,6 +10040,7 @@ function App() {
   else if (route.startsWith("clone/")) page = <window.ClonePage id={route.split("/")[1]} role={role} go={go} toast={toast} />;
   else if (route.startsWith("quick-clone/")) page = <window.QuickClonePage id={route.split("/")[1]} go={go} toast={toast} />;
   else if (route.startsWith("branch/")) page = <window.BranchPage id={route.split("/")[1]} role={role} go={go} toast={toast} />;
+  else if (route.startsWith("customize/")) page = <window.CustomizePage id={route.split("/")[1]} go={go} toast={toast} />;
   else page = <window.TemplatesPage go={go} />;
 
   const appClassName = route === "templates" ? "app app-homepage" : "app";

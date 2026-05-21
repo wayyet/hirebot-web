@@ -192,6 +192,7 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .nav-link.muted { color: var(--c-body-soft); }
+.nav-link.muted:hover { color: var(--c-near-black); }
 .nav-link.active { color: var(--c-near-black); }
 .nav-link.active::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -22px;
