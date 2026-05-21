@@ -50,7 +50,8 @@ const TEMPLATES = [
       "不直接对外发送 offer 与合同",
       "不替代背调或法律意见"
     ],
-    tags: ["AI增强", "信息处理"]
+    tags: ["AI增强", "信息处理"],
+    updatedAt: "2025-03-10"
   },
   {
     id: "tpl_contract",
@@ -72,7 +73,8 @@ const TEMPLATES = [
       "不替代律师签署",
       "不提供管辖法域之外的意见"
     ],
-    tags: ["信息处理", "工具"]
+    tags: ["信息处理", "工具"],
+    updatedAt: "2025-04-02"
   },
   {
     id: "tpl_qa",
@@ -94,7 +96,8 @@ const TEMPLATES = [
       "不直接处罚员工",
       "不修改 CRM 工单"
     ],
-    tags: ["信息处理", "工具"]
+    tags: ["信息处理", "工具"],
+    updatedAt: "2025-02-18"
   },
   {
     id: "tpl_lead",
@@ -116,7 +119,8 @@ const TEMPLATES = [
       "不直接联系客户",
       "不修改公海规则"
     ],
-    tags: ["AI增强", "工具"]
+    tags: ["AI增强", "工具"],
+    updatedAt: "2025-04-15"
   },
   {
     id: "tpl_research",
@@ -138,7 +142,8 @@ const TEMPLATES = [
       "不发布对外文章",
       "不进行交易性建议"
     ],
-    tags: ["信息处理", "AI增强"]
+    tags: ["信息处理", "AI增强"],
+    updatedAt: "2025-05-01"
   },
   {
     id: "tpl_finops",
@@ -160,7 +165,8 @@ const TEMPLATES = [
       "不直接审批付款",
       "不替代税务申报"
     ],
-    tags: ["信息处理", "开发工具"]
+    tags: ["信息处理", "开发工具"],
+    updatedAt: "2025-03-28"
   }
 ];
 
@@ -177,6 +183,7 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "2 小时前",
+    createdAt: "2024-03-12",
     tags: ["AI增强", "HR"],
     runs: 128,
     cloned: 12,
@@ -194,6 +201,7 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "今天 11:24",
+    createdAt: "2024-04-02",
     tags: ["信息处理"],
     runs: 0,
     cloned: 0,
@@ -211,6 +219,7 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "今天 09:08",
+    createdAt: "2024-04-10",
     tags: ["信息处理"],
     runs: 0,
     cloned: 0,
@@ -228,6 +237,7 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "昨天",
+    createdAt: "2024-04-18",
     tags: ["AI增强", "工具"],
     runs: 0,
     cloned: 0,
@@ -245,6 +255,7 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "3 天前",
+    createdAt: "2024-05-01",
     tags: ["信息处理"],
     runs: 86,
     cloned: 5,
@@ -262,9 +273,11 @@ const DEPT_EMPLOYEES = [
     owner: "李部门长",
     dept: "研发部",
     updated: "昨天 17:42",
+    createdAt: "2024-05-08",
     tags: ["信息处理"],
     runs: 0,
     cloned: 0,
+    hireProgress: 3,
     failedReason: "差距挖掘"
   }
 ];
@@ -414,7 +427,9 @@ function cloneObject(source) {
 }
 
 function findEmployeeById(id) {
-  return DEPT_EMPLOYEES.find(e => e.id === id) || MY_EMPLOYEES.find(e => e.id === id);
+  return DEPT_EMPLOYEES.find(e => e.id === id)
+    || MY_EMPLOYEES.find(e => e.id === id)
+    || (window.__DATA__ && window.__DATA__.employees && window.__DATA__.employees.find(e => e.id === id));
 }
 
 function findTemplateById(id) {
@@ -705,14 +720,6 @@ function TopNav({ role, setRole, route, go }) {
         <div className="nav-spacer" />
 
         <div className="nav-right">
-          <div className="role-switch" title="演示模式 · 切换查看角色">
-            <button className={isManager ? "active" : ""} onClick={() => setRole("manager")}>
-              <span className="role-emoji">🧑‍💼</span> 部门长
-            </button>
-            <button className={!isManager ? "active" : ""} onClick={() => setRole("member")}>
-              <span className="role-emoji">🧑‍💻</span> 普通成员
-            </button>
-          </div>
           <div className="user-chip">
             <Avatar initial={viewer.short} tint={isManager ? "blue" : "green"} size="sm" />
             <span>{viewer.name} · {viewer.dept}</span>
@@ -877,12 +884,6 @@ function EmployeeCard({ emp, onClick, footerActions, extraPanel, cardHint }) {
 
       <p className="emp-desc">{emp.desc}</p>
 
-      <div className="emp-tags">
-        {(emp.tags || []).slice(0, 3).map((tag, idx) => (
-          <span key={`${tag}-${idx}`} className={`pill ${["blue", "orange", "green", "gray", "pink", "purple"][idx % 6]}`}>{tag}</span>
-        ))}
-      </div>
-
       {emp.status === "interning_ai" && typeof emp.evalProgress === "number" && (
         <div>
           <div className="row between" style={{ fontSize: 12, color: "var(--c-body-soft)", marginBottom: 6 }}>
@@ -901,7 +902,7 @@ function EmployeeCard({ emp, onClick, footerActions, extraPanel, cardHint }) {
         </div>
       )}
 
-      {emp.status === "hired" && typeof emp.hireProgress === "number" && (
+      {(emp.status === "hired" || emp.status === "failed") && typeof emp.hireProgress === "number" && (
         <div>
           <div className="row between" style={{ fontSize: 12, color: "var(--c-body-soft)", marginBottom: 6 }}>
             <span>雇佣流程进度</span><span className="tnum">{emp.hireProgress}/6 步</span>
@@ -910,27 +911,11 @@ function EmployeeCard({ emp, onClick, footerActions, extraPanel, cardHint }) {
         </div>
       )}
 
-      {emp.status === "failed" && (
-        <div className="callout danger" style={{ padding: "8px 12px" }}>
-          评估失败 · 建议回退到「{emp.failedReason || "差距挖掘"}」工位
-        </div>
-      )}
-
       {extraPanel}
-
-      {cardHint && <div className="card-hint">{cardHint}</div>}
 
       <div className="emp-foot">
         <div className="emp-stats">
-          {emp.status === "live" ? (
-            <>
-              <span><Icon.users className="icn" /> {emp.cloned || 0} 复制</span>
-              <span><Icon.spark className="icn" /> {emp.runs || 0} 任务</span>
-              <span><Icon.clock className="icn" /> {emp.activeAt || "—"}</span>
-            </>
-          ) : (
-            <span>类型：{window.TYPE_LABEL[emp.type]}</span>
-          )}
+          {emp.createdAt && <span>创建于 {emp.createdAt}</span>}
         </div>
         <div className="emp-actions">
           {footerActions || (
@@ -1048,9 +1033,7 @@ function TemplatesPage({ go }) {
     <div className="page">
       <div className="page-header hero-header">
         <div>
-          <span className="eyebrow">部门长入口</span>
           <h1 className="page-title">从模板池出发，完成一条完整的 <em>部门版雇佣</em> 流程</h1>
-          <p className="page-sub">这里不生产模板，只负责选择已有模板并进入正式雇佣。页面动作收敛为搜索、查看详情、发起雇佣。</p>
         </div>
       </div>
 
@@ -1062,13 +1045,13 @@ function TemplatesPage({ go }) {
 
       <div className="spacer-24" />
 
-      <div className="row between" style={{ marginBottom: 14 }}>
-        <div className="subtabs">
-          <button className={`subtab ${source === "all" ? "active" : ""}`} onClick={() => setSource("all")}>全部</button>
-          <button className={`subtab ${source === "全局通用" ? "active" : ""}`} onClick={() => setSource("全局通用")}>全局通用</button>
-          <button className={`subtab ${source === "企业专属" ? "active" : ""}`} onClick={() => setSource("企业专属")}>企业专属</button>
+      <div className="tabs" style={{ justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
+          <a className={`tab ${source === "all" ? "active" : ""}`} onClick={() => setSource("all")}>全部</a>
+          <a className={`tab ${source === "全局通用" ? "active" : ""}`} onClick={() => setSource("全局通用")}>全局通用</a>
+          <a className={`tab ${source === "企业专属" ? "active" : ""}`} onClick={() => setSource("企业专属")}>企业专属</a>
         </div>
-        <span className="muted" style={{ fontSize: 12 }}>共 {list.length} 个模板</span>
+        <span className="muted" style={{ fontSize: 12, paddingBottom: 10 }}>共 {list.length} 个模板</span>
       </div>
 
       <div className="grid grid-3">
@@ -1092,14 +1075,13 @@ function TemplatesPage({ go }) {
             </div>
 
             <div className="emp-foot">
+              {item.updatedAt && <span>更新于 {item.updatedAt}</span>}
               <button className="btn-link" onClick={evt => { evt.stopPropagation(); go(`template/${item.id}`); }}>查看详情 →</button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="spacer-24" />
-      <div className="muted" style={{ textAlign: "center", fontSize: 13 }}>📝 模板池只展示企业可雇佣的模板，新增模板统一由构建端生产。</div>
     </div>
   );
 }
@@ -1114,7 +1096,7 @@ function DeptPage({ role, go }) {
     ? [
         { id: "all", label: "全部", filter: () => true },
         { id: "hired", label: "已雇佣", filter: item => item.status === "hired" || item.status === "failed" },
-        { id: "intern", label: "待实习", filter: item => item.status === "interning_ai" || item.status === "interning_human" },
+        { id: "intern", label: "实习中", filter: item => item.status === "interning_ai" || item.status === "interning_human" },
         { id: "live", label: "已上岗", filter: item => item.status === "live" }
       ]
     : [{ id: "live", label: "已上岗", filter: item => item.status === "live" }];
@@ -1144,8 +1126,8 @@ function DeptPage({ role, go }) {
           <h1 className="page-title">部门数字员工 · <em>研发部</em></h1>
         </div>
         {isManager && (
-          <button className="btn btn-primary" onClick={() => go("templates")}>
-            <window.Icon.plus className="icn" /> 从模板雇佣
+          <button className="btn btn-ghost" onClick={() => go("templates")}>
+            <window.Icon.plus className="icn" /> 从模板池雇佣
           </button>
         )}
       </div>
@@ -1197,7 +1179,6 @@ function DeptPage({ role, go }) {
               key={employee.id}
               emp={employee}
               onClick={handleClick}
-              cardHint={isManager && employee.status === "live" ? `已上岗员工支持"快捷复制"，但卡片主动作仍然统一进入详情页。` : (!isManager ? "卡片进入详情页后可创建你的个人分身。" : "")}
               footerActions={(
                 <div className="action-row">
                   {employee.status === "interning_ai" && (
@@ -2404,20 +2385,19 @@ function Toolbar({ filter, setFilter, view, setView, counts }) {
     ? allItems.filter((i) => i.key === "全部")
     : allItems;
   return (
-    <div className="toolbar">
-      <div className="filters">
+    <div className="tabs" style={{ justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
         {items.map((f) => (
-          <button
+          <a
             key={f.key}
-            className={"filter " + (filter === f.key ? "on" : "")}
+            className={"tab " + (filter === f.key ? "active" : "")}
             onClick={() => setFilter(f.key)}
           >
-            <span>{f.key}</span>
-            <span className="filter-count">{f.count}</span>
-          </button>
+            {f.key} <span className="tab-count tnum">{f.count}</span>
+          </a>
         ))}
       </div>
-      <div className="view-toggle">
+      <div className="view-toggle" style={{ paddingBottom: 10 }}>
         <button className={view === "card" ? "on" : ""} onClick={() => setView("card")}>
           {I.grid}卡片
         </button>
@@ -2589,7 +2569,7 @@ function FileChip({ kind }) {
   return <span className={"file-chip tone-" + t.tone}>{t.label}</span>;
 }
 
-function ListChatView({ list, requestedActiveId, onRequestConsumed, onGoIM }) {
+function ListChatView({ list, requestedActiveId, onRequestConsumed, onGoIM, onSwitchToCard, onGoDept }) {
   // Only employees who are 已上岗 can be conversed with.
   const chatable = _myUm(() => list.filter((e) => e.status === "live"), [list]);
   const [activeId, setActiveId] = _myUs(requestedActiveId || chatable[0]?.id);
@@ -2739,6 +2719,22 @@ function ListChatView({ list, requestedActiveId, onRequestConsumed, onGoIM }) {
       <circle cx="17" cy="14" r="2.2" fill="currentColor" opacity="0.18"/>
     </svg>
   );
+
+  if (chatable.length === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "64px 24px", gap: 12, textAlign: "center" }}>
+        <div style={{ fontSize: 36, lineHeight: 1 }}>🤖</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--c-near-black)", marginTop: 8 }}>还没有已上岗的数字员工</div>
+        <div style={{ fontSize: 13, color: "var(--c-body-soft)", maxWidth: 320, lineHeight: 1.6 }}>
+          列表 · 会话模式仅展示已上岗的员工。你可以查看雇佣中或实习中的员工，也可以去部门复制一个分身。
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <button className="btn btn-ghost" onClick={onSwitchToCard}>查看其他员工</button>
+          <button className="btn btn-primary" onClick={onGoDept}>去部门复制分身</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={"split " + (showOutput ? "with-output" : "") + (listCollapsed ? " list-collapsed" : "")}>
@@ -2984,7 +2980,7 @@ function ListChatView({ list, requestedActiveId, onRequestConsumed, onGoIM }) {
 /* ---------------- root ---------------- */
 function MyPage({ role, go }) {
   const [filter, setFilter] = _myUs("全部");
-  const [view, setView] = _myUs("card");
+  const [view, setView] = _myUs(() => _myEmps.filter(e => e.status === "live").length > 0 ? "list" : "card");
   const [empList, setEmpList] = _myUs(_myEmps);
   const [detailId, setDetailId] = _myUs(null);
   const [imCfgId, setImCfgId] = _myUs(null);
@@ -3105,14 +3101,14 @@ function MyPage({ role, go }) {
           <div>
             <h1 className="title">我的数字员工</h1>
           </div>
-          <button className="copy-btn">新增员工</button>
+          <button className="copy-btn" onClick={() => go("dept")}>新增员工</button>
         </div>
 
         <Toolbar filter={filter} setFilter={setFilter} view={view} setView={setView} counts={counts}/>
 
         {view === "card"
           ? <CardView list={list} onReEnable={reEnable} onRemove={remove} onOpen={setDetailId} onStartChat={startChat} onGoIM={setGoImEmpId} onGoEval={(id, type) => go(type === "ai" ? `eval-ai/${id}` : `eval-human/${id}`)}/>
-          : <ListChatView list={list} requestedActiveId={chatEmpId} onRequestConsumed={() => setChatEmpId(null)} onGoIM={setGoImEmpId}/>}
+          : <ListChatView list={list} requestedActiveId={chatEmpId} onRequestConsumed={() => setChatEmpId(null)} onGoIM={setGoImEmpId} onSwitchToCard={() => setView("card")} onGoDept={() => go("dept")}/>}
       </div>
       <GoIMModal
         open={!!goImEmpId}
@@ -5539,7 +5535,7 @@ function HirePage({ id, tpl, go, toast }) {
     ? window.findTemplateById(tpl)
     : (existing ? window.findTemplateById(existing.template) : window.TEMPLATES[0]);
   const isBranchFlow = !!existing && existing.type === "private_branch";
-  const isCustomizeFlow = !!existing && existing.type === "personal_clone" && !!existing.customizing;
+  const isCustomizeFlow = !!existing && (existing.type === "personal_clone" || existing.role === "部门分身") && !!existing.customizing;
   const backTo = (isBranchFlow || isCustomizeFlow) ? "my" : "dept";
   const cacheKey = `${HIRE_V2_CACHE_PREFIX}:${existing ? existing.id : `tpl:${template && template.id}`}`;
   const savedFlow = readFlowCache(cacheKey);
@@ -6587,7 +6583,7 @@ function HirePage({ id, tpl, go, toast }) {
 
   return (
     <div className="page">
-      <window.Crumb label={`返回${isBranchFlow ? "我的数字员工" : "部门数字员工"}`} onClick={() => go(backTo)} />
+      <window.Crumb label={`返回${(isBranchFlow || isCustomizeFlow) ? "我的数字员工" : "部门数字员工"}`} onClick={() => go(backTo)} />
 
       <div className={`hire-flow-v2 ${flow.background === "cool" ? "is-bg-cool" : ""}`}>
         <div className="app-shell">
@@ -8500,42 +8496,35 @@ function HumanEvalPage({ id, go, toast }) {
   return (
     <div className="page human-page">
       <div className="human-topbar">
-        <button className="human-back" onClick={() => go(`employee/${e.id}`)}>
-          <window.Icon.back className="icn" />
-          返回
-        </button>
-        <div className="human-topbar-divider" />
-        <div>
+        <div className="human-topbar-row1">
+          <button className="human-back" onClick={() => go(`employee/${e.id}`)}>
+            <window.Icon.back className="icn" />
+            返回
+          </button>
+          <div style={{ flex: 1 }} />
+          <div className="human-topbar-badges">
+            <span className="human-badge green">AI 评估已通过</span>
+            {humanEvalPassed
+              ? <span className="human-badge green">人工评估通过</span>
+              : <span className="human-badge indigo">人工评估进行中</span>
+            }
+            {showReportButton && (
+              <button className="btn btn-primary btn-sm" onClick={() => setShowReportModal(true)}>
+                查看综合报告
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="human-topbar-row2">
           <h1 className="human-topbar-title">人工评估</h1>
-          <p className="human-topbar-sub">{e.name} · {e.desc || '数字员工'}</p>
+          <div className="human-topbar-stepper-wrap">
+            <HumanScenarioProgressBar scenarios={scenarios} />
+          </div>
         </div>
-        <div className="human-topbar-badges">
-          <span className="human-badge green">AI 评估已通过</span>
-          {humanEvalPassed
-            ? <span className="human-badge green">人工评估通过</span>
-            : <span className="human-badge indigo">人工评估进行中</span>
-          }
-          {showReportButton && (
-            <button className="btn btn-primary btn-sm" onClick={() => setShowReportModal(true)}>
-              查看综合报告
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="human-progress-wrap">
-        <HumanScenarioProgressBar scenarios={scenarios} />
       </div>
 
       <div className="human-main">
         <div className="human-chat-panel">
-          <div className="human-nav-wrap">
-            <HumanScenarioNavigator
-              scenarios={scenarios}
-              currentScenarioId={currentScenarioId}
-              onNavigate={setCurrentScenarioId}
-            />
-          </div>
           <div className="human-messages">
             {messages.map(msg => (
               <HumanChatMessage
@@ -9318,7 +9307,7 @@ function PublishPage({ id, role, go, toast }) {
             <div className="row between wrap">
               {isDepartment
                 ? <button className="btn btn-ghost btn-sm" onClick={() => go("dept")}>稍后再说</button>
-                : <button className="btn btn-ghost btn-sm" onClick={() => go(`im/${employee.id}`)}>配置 IM</button>}
+                : <button className="btn btn-ghost btn-sm" onClick={() => go("my")}>返回我的数字员工</button>}
               {isDepartment
                 ? <button className="btn btn-primary btn-sm" onClick={() => go(`clone/${employee.id}`)}>立即创建我的分身 <window.Icon.arrow className="icn" /></button>
                 : <button className="btn btn-primary btn-sm" onClick={() => go(`chat/${employee.id}`)}>立即开始对话 <window.Icon.arrow className="icn" /></button>}
