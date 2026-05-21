@@ -351,6 +351,8 @@ const MY_EMPLOYEES = [
     parentName: "服务小检",
     template: "tpl_qa",
     status: "retired",
+    customized: true,
+    customizing: false,
     desc: "已退役，使用记录可作为历史对照。",
     owner: "李部门长",
     updated: "上月 28 日",
@@ -2020,8 +2022,17 @@ function MoreMenu({ items }) {
   );
 }
 
-function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM, onCustomize, onRetire }) {
+function DetailActions({ emp, onReEnable, onRemove, onStartChat, onGoIM, onCustomize, onRetire, onContinueCustomize }) {
   const status = emp.status;
+  if ((status === "hired" || status === "evaluating" || status === "humanEval") && emp.customizing) {
+    return (
+      <div className="action-stack">
+        <button className="action-primary" onClick={() => onContinueCustomize && onContinueCustomize(emp.id)}>
+          <span>继续定制</span><DetailIcon name="arrow-right"/>
+        </button>
+      </div>
+    );
+  }
   if (status === "live") {
     const canCustomize = (emp.type === "personal_clone" || emp.role === "部门分身") && !emp.customized && !emp.customizing;
     const moreItems = [];
@@ -2136,7 +2147,7 @@ function IntroStat({ icon, value, label }) {
   );
 }
 
-function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, onCustomize, onRetire, statusMap }) {
+function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfigurePlatform, onStartChat, onGoIM, onCustomize, onRetire, onContinueCustomize, statusMap }) {
   const d = DETAIL_DATA[emp.id] || {};
   const s = statusMap[emp.status] || { label: "已退役", cls: "status-pending" };
 
@@ -2178,7 +2189,7 @@ function DetailPage({ emp, onBack, onReEnable, onRemove, onOpenImConfig, onConfi
             <p className="detail-desc">{emp.desc}</p>
           </div>
         </div>
-        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM} onCustomize={onCustomize} onRetire={onRetire}/>
+        <DetailActions emp={emp} onReEnable={handleReEnable} onRemove={handleRemove} onStartChat={onStartChat} onGoIM={onGoIM} onCustomize={onCustomize} onRetire={onRetire} onContinueCustomize={onContinueCustomize}/>
       </section>
 
       {/* ============= unified intro card ============= */}
@@ -2414,7 +2425,9 @@ const statusMap = {
   live: { label: "已上岗", cls: "status-live" },
   evaluating: { label: "AI 评估中", cls: "status-eval" },
   humanEval: { label: "人工评估中", cls: "status-eval" },
+  hired: { label: "定制中", cls: "status-eval" },
   pending: { label: "已退役", cls: "status-pending" },
+  retired: { label: "已退役", cls: "status-pending" },
 };
 const tagClass = { HR: "tag-hr", 情报: "tag-info", 写作: "tag-writing" };
 
@@ -3030,26 +3043,25 @@ function MyPage({ role, go }) {
     setEmpList((L) => L.filter((e) => e.id !== id));
 
   const list = _myUm(() => {
-    // 在列表模式下只能选到可对话的员工，面包调整为已上岗。
+    // 列表模式只展示已上岗（live）员工；卡片模式展示全部。
     const pool = view === "list"
-      ? empList.filter((e) => e.status !== "pending" && e.status !== "retired")
+      ? empList.filter((e) => e.status === "live")
       : empList;
     if (filter === "全部") return pool;
     if (filter === "已上岗") return pool.filter((e) => e.status === "live");
-    if (filter === "实习中") return pool.filter((e) => e.status === "evaluating" || e.status === "humanEval");
+    if (filter === "实习中") return pool.filter((e) => e.status === "evaluating" || e.status === "humanEval" || (e.status === "hired" && e.customizing));
     if (filter === "私人定制") return pool.filter((e) => e.role === "私人定制");
     if (filter === "已退役") return pool.filter((e) => e.status === "pending" || e.status === "retired");
     return pool;
   }, [filter, view, empList]);
 
   const counts = _myUm(() => {
-    const activePool = empList.filter((e) => e.status !== "pending" && e.status !== "retired");
-    const pool = view === "list" ? activePool : empList;
+    const livePool = empList.filter((e) => e.status === "live");
     return {
-      all:        view === "list" ? activePool.length : empList.length,
-      live:       pool.filter((e) => e.status === "live").length,
-      intern:     pool.filter((e) => e.status === "evaluating" || e.status === "humanEval").length,
-      custom:     pool.filter((e) => e.role === "私人定制").length,
+      all:        view === "list" ? livePool.length : empList.length,
+      live:       livePool.length,
+      intern:     empList.filter((e) => e.status === "evaluating" || e.status === "humanEval" || (e.status === "hired" && e.customizing)).length,
+      custom:     empList.filter((e) => e.role === "私人定制").length,
       pending:    empList.filter((e) => e.status === "pending" || e.status === "retired").length,
     };
   }, [view, empList]);
@@ -3101,6 +3113,7 @@ function MyPage({ role, go }) {
               onGoIM={() => setGoImEmpId(emp.id)}
               onCustomize={() => go(`customize/${emp.id}`)}
               onRetire={(id) => setRetireConfirmId(id)}
+              onContinueCustomize={(id) => go(`hire/${id}`)}
               onConfigurePlatform={(platform) => {
                 if (emp.im[platform] === "connected") return;
                 openConfigure(emp.id, platform);
@@ -3247,22 +3260,26 @@ function buildEmployeeActions(employee, role, go, toast, setJumpPicker) {
       }
     }
   } else {
-    if (employee.status === "live" && isOwner) {
-      actions.push({ label: "开始对话", primary: true, go: () => go(`chat/${employee.id}`) });
-      if (window.getConnectedChannels(employee.id).length) actions.push({ label: "去 IM", go: () => setJumpPicker(true) });
-      actions.push({ label: "配置 IM", go: () => setImModal(true) });
-      if ((employee.type === "personal_clone" || employee.role === "部门分身") && !employee.customized && !employee.customizing) actions.push({ label: "私人定制", go: () => go(`customize/${employee.id}`) });
-      actions.push({
-        label: "退役",
-        go: () => setRetireConfirm(true)
-      });
-    }
-    if ((employee.status === "interning_ai" || employee.status === "interning_human") && isOwner) {
-      actions.push({
-        label: employee.status === "interning_ai" ? "查看 AI 评估" : "查看人工评估",
-        primary: true,
-        go: () => go(employee.status === "interning_ai" ? `eval-ai/${employee.id}` : `eval-human/${employee.id}`)
-      });
+    if (employee.customizing && (employee.status === "hired" || employee.status === "interning_ai" || employee.status === "interning_human") && isOwner) {
+      actions.push({ label: "继续定制", primary: true, go: () => go(`hire/${employee.id}`) });
+    } else {
+      if (employee.status === "live" && isOwner) {
+        actions.push({ label: "开始对话", primary: true, go: () => go(`chat/${employee.id}`) });
+        if (window.getConnectedChannels(employee.id).length) actions.push({ label: "去 IM", go: () => setJumpPicker(true) });
+        actions.push({ label: "配置 IM", go: () => setImModal(true) });
+        if ((employee.type === "personal_clone" || employee.role === "部门分身") && !employee.customized && !employee.customizing) actions.push({ label: "私人定制", go: () => go(`customize/${employee.id}`) });
+        actions.push({
+          label: "退役",
+          go: () => setRetireConfirm(true)
+        });
+      }
+      if ((employee.status === "interning_ai" || employee.status === "interning_human") && isOwner) {
+        actions.push({
+          label: employee.status === "interning_ai" ? "查看 AI 评估" : "查看人工评估",
+          primary: true,
+          go: () => go(employee.status === "interning_ai" ? `eval-ai/${employee.id}` : `eval-human/${employee.id}`)
+        });
+      }
     }
   }
 
@@ -3322,13 +3339,15 @@ function EmployeeDetailPage({ id, role, go, toast }) {
   const visible = capOpen || allCaps.length <= PREVIEW ? allCaps : allCaps.slice(0, PREVIEW);
   const hidden = allCaps.length - PREVIEW;
 
-  const statusNote = employee.status === "live"
-    ? "已上岗实例可以直接进入站内对话，个人资产还可以按需配置 IM 并从平台拉起。"
-    : employee.status === "interning_ai"
-      ? "AI 评估通过后才允许进入人工评估。"
-      : employee.status === "interning_human"
-        ? "人工评估通过后进入发布确认，不再把 IM 配置当成上岗前置条件。"
-        : "失败时通过 Review 选择回退工位，已上传原料会保留。";
+  const statusNote = employee.customizing
+    ? "私人定制进行中：该员工正在重走雇佣→评估→发布流程，完成后将以相同 ID 重新上岗，当前定制不可回退。"
+    : employee.status === "live"
+      ? "已上岗实例可以直接进入站内对话，个人资产还可以按需配置 IM 并从平台拉起。"
+      : employee.status === "interning_ai"
+        ? "AI 评估通过后才允许进入人工评估。"
+        : employee.status === "interning_human"
+          ? "人工评估通过后进入发布确认，不再把 IM 配置当成上岗前置条件。"
+          : "失败时通过 Review 选择回退工位，已上传原料会保留。";
 
   return (
     <div className="page">
@@ -9474,10 +9493,12 @@ function PublishPage({ id, role, go, toast }) {
       setDoneCount(pointer);
       if (pointer >= steps.length) {
         clearInterval(timer);
-        window.updateEmployee(employee.id, { status: "live", updated: "刚刚", activeAt: "刚刚", owner: employee.owner || viewer.name });
+        const livePatch = { status: "live", updated: "刚刚", activeAt: "刚刚", owner: employee.owner || viewer.name };
+        if (employee.customizing) { livePatch.customized = true; livePatch.customizing = false; }
+        window.updateEmployee(employee.id, livePatch);
         setTimeout(() => {
           setPhase(2);
-          toast(isDepartment ? "部门员工已发布" : "分身已上岗");
+          toast(isDepartment ? "部门员工已发布" : employee.customizing ? "私人定制完成，分身已上岗" : "分身已上岗");
         }, 250);
       }
     }, 550);
